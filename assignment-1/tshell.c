@@ -4,7 +4,7 @@
  * @author Naxin Fang
  * @github https://github.com/fangnx
  * @created 2019-09-21 15:42:16
- * @last-modified 2019-09-29 22:32:24
+ * @last-modified 2019-09-29 22:51:03
  */
 
 #include <fcntl.h>
@@ -24,6 +24,7 @@
 #define PROMPT "\e[96m(naxin.fang)\e[0m \e[92m->\e[0m "
 #define MAX_LINE_LENGTH 120
 #define MAX_HISTORY_AMOUNT 10
+#define FIFO_PATH "/tmp/tshell_fifo"
 
 struct hist {
   char line[MAX_LINE_LENGTH];
@@ -125,14 +126,9 @@ int find_pipe(char *args[]) {
  * Implemented FIFO pipe.
  */
 void run_pipe(char *args[], int pipe_index) {
-  char *fifo_path =
-      "/Users/fnx/Dropbox/Academics/COMP "
-      "310/comp310-operating-system/assignment-1/fifo";
-  mkfifo(fifo_path, 0777);
-
+  mkfifo(FIFO_PATH, 0777);
+  char *abs_path = realpath(FIFO_PATH, NULL);
   args[pipe_index] = NULL;
-  char *abs_path = realpath(fifo_path, NULL);
-
   int pid_in, pid_out, fd[2], fdp;
   pipe(fd);
   // Forking a child process to handle pipe_in.
@@ -162,7 +158,7 @@ void run_pipe(char *args[], int pipe_index) {
       }
     }
   } else {  // Parent process.
-    wait(NULL);
+    waitpid(-1, NULL, 0);
   }
 }
 
@@ -208,15 +204,13 @@ int main(int argc, char *argv[]) {
     memset(line, 0, MAX_LINE_LENGTH);
     memset(args, 0, MAX_LINE_LENGTH);
 
-    printf(PROMPT);  // Print shell line prompt.
+    printf(PROMPT);
     fflush(stdout);
 
     line_length = read_line(line);
     if (line_length > 1) {
       parse_line(line, line_length, args);
       record_history(*args);
-
-      fflush(stdout);
       shell_system(args);
     }
   }
