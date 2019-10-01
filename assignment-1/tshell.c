@@ -4,10 +4,11 @@
  * @author Naxin Fang
  * @github https://github.com/fangnx
  * @created 2019-09-21 15:42:16
- * @last-modified 2019-09-30 13:31:37
+ * @last-modified 2019-10-01 01:11:52
  */
 
 #include <fcntl.h>
+#include <setjmp.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,20 +24,30 @@
 #endif
 
 #define PROMPT "\e[96m(naxin.fang)\e[0m \e[92m->\e[0m "
+// #define PROMPT ""
 #define MAX_LINE_LENGTH 120
 #define MAX_HISTORY_AMOUNT 100
-#define FIFO_PATH "/tmp/tshell_fifo"
 
 struct hist {
   char line[MAX_LINE_LENGTH];
 };
 struct hist HISTORY[MAX_HISTORY_AMOUNT];
 int HIST_COUNT = 0;
+char FIFO_PATH[];
+sigjmp_buf RUNNING;
+
+/**
+ * Initialize fifo path according to the program argument.
+ */
+void init_fifo(char str[]) { strcpy(FIFO_PATH, str); }
 
 /**
  * Read the raw stdin by the user.
  */
-int read_line(char line[]) { return read(0, line, MAX_LINE_LENGTH); }
+int read_line(char line[]) {
+  size_t line_size = 120;
+  return getline(&line, &line_size, stdin);
+}
 
 /**
  * Tokenize the input line by splitting it by space.
@@ -63,8 +74,11 @@ void parse_line(char line[], int length, char *commands[]) {
 /**
  * Record the input line to history.
  */
-void record_history(char args[]) {
-  strcpy(HISTORY[HIST_COUNT % MAX_HISTORY_AMOUNT].line, args);
+void record_history(char line[], int line_length) {
+  if (line[line_length - 1] == '\n') {
+    line[line_length - 1] = '\0';
+  };
+  strcpy(HISTORY[HIST_COUNT % MAX_HISTORY_AMOUNT].line, line);
   HIST_COUNT++;
 }
 
@@ -95,12 +109,14 @@ void set_limit(char *args[]) {
 
   new_lim.rlim_cur = atoi(args[1]);
   new_lim.rlim_max = old_lim.rlim_max;
+  // new_lim.rlim_max = atoi(args[1]);
 
-  if (setrlimit(RLIMIT_NOFILE, &new_lim) == -1) {
-    printf("Error: an error occurred during setting RLIMIT.");
+  if (setrlimit(RLIMIT_DATA, &new_lim) == -1) {
+    printf("Error: an error occurred during setting RLIMIT.\n");
+  } else {
+    printf("New limits have been set.\nSoft limit: %llu\nHard limit: %llu\n",
+           new_lim.rlim_cur, new_lim.rlim_max);
   }
-  printf("New limits have been set.\nSoft limit: %llu\nHard limit: %llu\n",
-         new_lim.rlim_cur, new_lim.rlim_max);
 }
 
 /**
@@ -109,8 +125,8 @@ void set_limit(char *args[]) {
 void execute_command(char *args[]) {
   if (execvp(args[0], args) < 0) {
     printf("tshell: command not found: %s\n", args[0]);
-    exit(1);
   }
+  exit(0);
 }
 
 /**
@@ -135,6 +151,12 @@ int find_pipe(char *args[]) {
  * Implemented FIFO pipe.
  */
 void run_pipe(char *args[], int pipe_index) {
+  if (strcmp(FIFO_PATH, "") == 0) {
+    printf(
+        "FIFO pipe is not initialized. Please provide the path as a program "
+        "argument.\n");
+    return;
+  }
   mkfifo(FIFO_PATH, 0777);
   char *abs_path = realpath(FIFO_PATH, NULL);
   args[pipe_index] = NULL;
@@ -156,7 +178,7 @@ void run_pipe(char *args[], int pipe_index) {
       dup2(fdp, fileno(stdin));  // Redirect stdin to pipe.
       close(fd[1]);
       if (execvp(args[pipe_index + 1], &args[pipe_index + 1]) < 0) {
-        printf("tshell: command not found: %s\n", args[0]);
+        printf("tshell: command not found: %s\n", args[pipe_index + 1]);
         exit(1);
       }
     } else {
@@ -178,7 +200,8 @@ void run_pipe(char *args[], int pipe_index) {
 /**
  * Run commands in the t_shell.
  */
-void shell_system(char *args[]) {
+int shell_system(char *args[]) {
+  int w;
   if (strcmp(args[0], "chdir") == 0 || strcmp(args[0], "cd") == 0) {
     change_dir(args);
   } else if (strcmp(args[0], "history") == 0) {
@@ -199,48 +222,61 @@ void shell_system(char *args[]) {
         exit(1);
       } else if (pid == 0) {  // Child process.
         execute_command(args);
-      } else {                 // Parent process.
-        waitpid(-1, NULL, 0);  // Wait for any child.
+      } else {                      // Parent process.
+        w = waitpid(pid, NULL, 0);  // Wait for child.
       }
     }
   }
+  return w;
 }
 
 // Handle SIGINT signal.
 void handle_sigint(int sig) {
-  char line[MAX_LINE_LENGTH];
-  printf("\nDo you want to exit tshell (y/n)?\n");
-  fgets(line, sizeof(line), stdin);
-  if (line[0] == 'y') {
+  size_t line_size = 120;
+  char line[line_size], ch;
+  printf("\nDo you want to exit tshell (y/n)? ");
+  ch = getchar();
+  if (ch == 'y') {
     exit(0);
   }
-  printf(PROMPT);
-  fflush(stdout);
+  fflush(stdin);
+  siglongjmp(RUNNING, 1);
 }
 
 // Handle STGTSTP signal.
 void handle_sigtstp(int sig) { return; }
 
 int main(int argc, char *argv[]) {
-  int line_length;
+  int line_length, w;
   char line[MAX_LINE_LENGTH];
   char *args[MAX_LINE_LENGTH];
 
   signal(SIGINT, handle_sigint);
   signal(SIGTSTP, handle_sigtstp);
 
+  if (argc > 1) {
+    init_fifo(argv[1]);
+  }
+
   while (1) {
     memset(line, 0, MAX_LINE_LENGTH);
     memset(args, 0, MAX_LINE_LENGTH);
-
     printf(PROMPT);
     fflush(stdout);
 
+    sigsetjmp(RUNNING, 1);
+
     line_length = read_line(line);
+    fflush(stdin);
+    // Handle EOF.
+    if (line_length == -1) {
+      exit(0);
+    }
+    // Proceed if stdin is not empty.
     if (line_length > 1) {
+      record_history(line, line_length);
       parse_line(line, line_length, args);
-      record_history(*args);
-      shell_system(args);
+      w = shell_system(args);
     }
   }
   return 0;

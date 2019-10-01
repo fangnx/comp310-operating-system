@@ -1,0 +1,12 @@
+ls -l
+ls -l | wc
+ls -la | grep malloc
+mkdir hello
+cd hello
+ls -l
+touch hello.c hello.py hello.html
+ls -la | grep py
+cd ..
+rm -rf hello 
+ls -l | invalid
+history
