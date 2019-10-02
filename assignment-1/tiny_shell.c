@@ -4,7 +4,7 @@
  * @author Naxin Fang
  * @github https://github.com/fangnx
  * @created 2019-09-21 15:42:16
- * @last-modified 2019-10-01 01:11:52
+ * @last-modified 2019-10-01 17:19:36
  */
 
 #include <fcntl.h>
@@ -39,7 +39,7 @@ sigjmp_buf RUNNING;
 /**
  * Initialize fifo path according to the program argument.
  */
-void init_fifo(char str[]) { strcpy(FIFO_PATH, str); }
+void init_fifo(char str[]) { realpath(str, FIFO_PATH); }
 
 /**
  * Read the raw stdin by the user.
@@ -114,7 +114,7 @@ void set_limit(char *args[]) {
   if (setrlimit(RLIMIT_DATA, &new_lim) == -1) {
     printf("Error: an error occurred during setting RLIMIT.\n");
   } else {
-    printf("New limits have been set.\nSoft limit: %llu\nHard limit: %llu\n",
+    printf("New limits have been set.\nSoft limit: %lu\nHard limit: %lu\n",
            new_lim.rlim_cur, new_lim.rlim_max);
   }
 }
@@ -125,8 +125,9 @@ void set_limit(char *args[]) {
 void execute_command(char *args[]) {
   if (execvp(args[0], args) < 0) {
     printf("tshell: command not found: %s\n", args[0]);
+    _exit(1);
   }
-  exit(0);
+  _exit(0);
 }
 
 /**
@@ -158,41 +159,48 @@ void run_pipe(char *args[], int pipe_index) {
     return;
   }
   mkfifo(FIFO_PATH, 0777);
-  char *abs_path = realpath(FIFO_PATH, NULL);
   args[pipe_index] = NULL;
   pid_t pid_in, pid_out;
+  int pid_out_cp;
   int fd[2], fdp;
   pipe(fd);
   // Forking a child process to handle pipe_in.
   pid_in = fork();
   if (pid_in < 0) {
-    exit(1);
+    _exit(1);
   } else if (pid_in == 0) {  // Child process.
     // Forking a granchild process to handle pipe_out.
     pid_out = fork();
     if (pid_out < 0) {
-      exit(1);
+      _exit(1);
     } else if (pid_out == 0) {  // Grandchild process.
       // Implement pipe_out.
-      fdp = open(abs_path, O_RDONLY);
+      fdp = open(FIFO_PATH, O_RDONLY);
       dup2(fdp, fileno(stdin));  // Redirect stdin to pipe.
-      close(fd[1]);
       if (execvp(args[pipe_index + 1], &args[pipe_index + 1]) < 0) {
         printf("tshell: command not found: %s\n", args[pipe_index + 1]);
-        exit(1);
+        _exit(1);
       }
+      _exit(0);
     } else {
       // Implement pipe_in.
-      fdp = open(abs_path, O_WRONLY);
-      dup2(fdp, fileno(stdout));  // Redirect stdout to pipe.
       close(fd[0]);
+      FILE *temp = fdopen(fd[1], "w");
+      fprintf(temp, "%d", pid_out);
+      fflush(temp);
+      fdp = open(FIFO_PATH, O_WRONLY);
+      dup2(fdp, fileno(stdout));  // Redirect stdout to pipe.
       if (execvp(args[0], args) < 0) {
         printf("tshell: command not found: %s\n", args[0]);
-        exit(1);
+        _exit(1);
       }
-      waitpid(pid_out, NULL, 0);
     }
   } else {  // Parent process.
+    close(fd[1]);
+    FILE *temp = fdopen(fd[0], "r");
+    fscanf(temp, "%d", &pid_out_cp);
+    // Wait both child & grandchild processes in parent.
+    waitpid(pid_out_cp, NULL, 0);
     waitpid(pid_in, NULL, 0);
   }
 }
@@ -200,8 +208,7 @@ void run_pipe(char *args[], int pipe_index) {
 /**
  * Run commands in the t_shell.
  */
-int shell_system(char *args[]) {
-  int w;
+void shell_system(char *args[]) {
   if (strcmp(args[0], "chdir") == 0 || strcmp(args[0], "cd") == 0) {
     change_dir(args);
   } else if (strcmp(args[0], "history") == 0) {
@@ -222,15 +229,15 @@ int shell_system(char *args[]) {
         exit(1);
       } else if (pid == 0) {  // Child process.
         execute_command(args);
-      } else {                      // Parent process.
-        w = waitpid(pid, NULL, 0);  // Wait for child.
+      } else {                  // Parent process.
+        waitpid(pid, NULL, 0);  // Wait for child.
       }
     }
   }
-  return w;
 }
-
-// Handle SIGINT signal.
+/**
+ * Handle SIGINT signal.
+ */
 void handle_sigint(int sig) {
   size_t line_size = 120;
   char line[line_size], ch;
@@ -243,9 +250,14 @@ void handle_sigint(int sig) {
   siglongjmp(RUNNING, 1);
 }
 
-// Handle STGTSTP signal.
+/**
+ * Handle STGTSTP signal.
+ */
 void handle_sigtstp(int sig) { return; }
 
+/**
+ * Program main.
+ */
 int main(int argc, char *argv[]) {
   int line_length, w;
   char line[MAX_LINE_LENGTH];
@@ -276,7 +288,7 @@ int main(int argc, char *argv[]) {
     if (line_length > 1) {
       record_history(line, line_length);
       parse_line(line, line_length, args);
-      w = shell_system(args);
+      shell_system(args);
     }
   }
   return 0;

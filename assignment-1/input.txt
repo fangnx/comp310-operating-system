@@ -1,0 +1,6 @@
+ls -l
+pwd
+echo hello | grep h
+cd .
+ls | wc
+history
