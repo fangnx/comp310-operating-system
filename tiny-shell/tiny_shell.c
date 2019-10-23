@@ -1,10 +1,10 @@
 /**
- * COMP 310 (Fall 2019) - Assignment 1
+ * tiny_shell.c
  *
- * @author Naxin Fang
+ * @author nxxinf
  * @github https://github.com/fangnx
  * @created 2019-09-21 15:42:16
- * @last-modified 2019-10-01 17:19:36
+ * @last-modified 2019-10-22 19:15:40
  */
 
 #include <fcntl.h>

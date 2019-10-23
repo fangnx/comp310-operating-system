@@ -1,4 +1,4 @@
-# COMP 310 Assignment 1 - Document
+# COMP 310 Assignment 1
 
 ### ltrace output
 ```
