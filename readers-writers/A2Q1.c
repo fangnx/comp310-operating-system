@@ -40,9 +40,6 @@ void *reader(void *arg) {
     sem_post(&mutex);
     clock_t t1 = clock();
     time_count = (double)(t1 - t0) / CLOCKS_PER_SEC * 1000;
-    min_read_time = MIN(min_read_time, time_count);
-    max_read_time = MAX(max_read_time, time_count);
-    total_read_time += time_count;
 
     sleep_time = rand() % 101 * 1000;
     usleep(sleep_time);
@@ -50,6 +47,9 @@ void *reader(void *arg) {
 
     sem_wait(&mutex);
     read_count--;
+		min_read_time = MIN(min_read_time, time_count);
+    max_read_time = MAX(max_read_time, time_count);
+    total_read_time += time_count;
     if (read_count == 0) {
       sem_post(&rw_mutex);
     }
