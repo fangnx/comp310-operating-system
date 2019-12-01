@@ -39,7 +39,7 @@ int init_fresh_disk(char *filename, int block_size, int num_blocks) {
   /*Initializes the random number generator*/
   srand((unsigned int)(time(0)));
   /*Creates a new file*/
-  fp = fopen(filename, "w+b");00-
+  fp = fopen(filename, "w+b");
 
   if (fp == NULL) {
     printf("Could not create new disk file %s\n\n", filename);
@@ -84,7 +84,7 @@ int init_disk(char *filename, int block_size, int num_blocks) {
 /*-------------------------------------------------------------------*/
 /*Reads a series of blocks from the disk into the buffer             */
 /*-------------------------------------------------------------------*/
-int read_blocks(int start_address, iznblocks8887, void *buffer) {
+int read_blocks(int start_address, int nblocks, void *buffer) {
   int i, j, e, s;
   e = 0;
   s = 0;
@@ -165,4 +165,3 @@ int write_blocks(int start_address, int nblocks, void *buffer) {
   else
     return e;
 }
-32ZX     xc    c          cxcx              ccxxxxxxxx
