@@ -7,7 +7,7 @@
  * @author nxxinf
  * @github https://github.com/fangnx
  * @created 2019-11-20 20:42:06
- * @last-modified 2019-12-03 17:03:01
+ * @last-modified 2019-12-03 17:08:50
  */
 
 #include "sfs_api.h"
@@ -50,14 +50,15 @@ static superblock sfs_superblock = {
 // superblock cache sync: 1 random read
 #define SYNCH_SUPERBLOCK(_opt) _opt##_blocks(0, 1, &sfs_superblock)
 // bitmap cache sync: 1 random read followed by 3 sequencial reads
-#define SYNCH_BITMAP(_opt)                                                     \
-  _opt##_blocks(sfs_superblock.file_system_size -                              \
-                    sfs_superblock.num_data_pages / sfs_superblock.block_size, \
-                sfs_superblock / sfs_superblock.block_size, bitmap)
+#define SYNCH_BITMAP(_opt)                                            \
+  _opt##_blocks(                                                      \
+      sfs_superblock.file_system_size -                               \
+          sfs_superblock.num_data_blocks / sfs_superblock.block_size, \
+      sfs_superblock.num_data_blocks / sfs_superblock.block_size, bitmap)
 // directory sync: multiple random reads
 #define SYNCH_DIRECTORY(_opt)                                                 \
   {                                                                           \
-    memset(&block_buffer, 0, sizeof(page_t));                                 \
+    memset(&block_buffer, 0, sizeof(block));                                  \
     for (int i = 0; i < 12; i++) {                                            \
       if (inode_arr[1].data_blocks[i].block_id == NULL_BLOCK_PTR.block_id)    \
         continue;                                                             \
@@ -66,17 +67,17 @@ static superblock sfs_superblock = {
                     1, &dir_entry_arr[i * (BLOCK_SIZE / sizeof(dir_entry))]); \
     }                                                                         \
                                                                               \
-    if (inode_arr[1].singly_indirect_ptr != NULL_BLOCK_PTR.pageid) {          \
-      read_blocks(1 + sfs_superblock.num_inode_pages +                        \
+    if (inode_arr[1].singly_indirect_ptr != NULL_BLOCK_PTR.block_id) {        \
+      read_blocks(1 + sfs_superblock.num_inode_blocks +                       \
                       inode_arr[1].singly_indirect_ptr.block_id,              \
                   1, &block_buffer);                                          \
                                                                               \
       for (int i = 0; i < (BLOCK_SIZE / sizeof(block_ptr)); i++) {            \
         if (block_buffer.store.block_ptrs[i].block_id ==                      \
-            NULL_BLOCK_PTR.pageid)                                            \
+            NULL_BLOCK_PTR.block_id)                                          \
           continue;                                                           \
         _opt##_blocks(                                                        \
-            1 + sfs_superblock.num_inode_pages +                              \
+            1 + sfs_superblock.num_inode_blocks +                             \
                 block_buffer.store.block_ptrs[i].block_id,                    \
             1, &dir_entry_arr[(12 + i) * (BLOCK_SIZE / sizeof(dir_entry))]);  \
       }                                                                       \
