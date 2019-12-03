@@ -7,7 +7,7 @@
  * @author nxxinf
  * @github https://github.com/fangnx
  * @created 2019-11-20 20:42:06
- * @last-modified 2019-12-03 17:46:41
+ * @last-modified 2019-12-03 18:20:58
  */
 
 #include "sfs_api.h"
@@ -454,7 +454,7 @@ int sfs_fclose(int fileID) {
  * Move the read pointer.
  */
 int sfs_frseek(int fileID, int loc) {
-  if (fileID < 0) {
+  if (fileID < 0 || fileID > sfs_superblock.num_data_blocks) {
     return -1;
   }
   file_table_entry file_entry = file_descriptor_table[fileID];
@@ -475,10 +475,10 @@ int sfs_frseek(int fileID, int loc) {
  * Move the write pointer.
  */
 int sfs_fwseek(int fileID, int loc) {
-  if (fileID < 0) {
+  if (fileID < 0 || fileID > sfs_superblock.num_data_blocks) {
     return -1;
   }
-  file_table_entry file_entry = file_descriptor_table[fileID];
+  // file_table_entry file_entry = file_descriptor_table[fileID];
   if (file_descriptor_table[fileID].inode_index != NULL_BLOCK_PTR.block_id &&
       0 <= loc && loc <= BLOCK_SIZE * (12 + BLOCK_SIZE / sizeof(block_ptr))) {
     // Move the write_ptr in the fdt entry.
@@ -525,6 +525,7 @@ int sfs_fwrite(int fileID, char *buf, int length) {
       if (assigned_block.block_id == NULL_BLOCK_PTR.block_id) {
         assigned_block.block_id = alloc_block();
         if (assigned_block.block_id == NULL_BLOCK_PTR.block_id) {
+          printf("!\n");
           break;
         }
       }
@@ -541,6 +542,7 @@ int sfs_fwrite(int fileID, char *buf, int length) {
       if (assigned_block.block_id == NULL_BLOCK_PTR.block_id) {
         assigned_block.block_id = alloc_block();
         if (assigned_block.block_id == NULL_BLOCK_PTR.block_id) {
+          printf("!~\n");
           break;
         }
 
@@ -549,12 +551,14 @@ int sfs_fwrite(int fileID, char *buf, int length) {
           block_buffer.store.block_ptrs[i] = NULL_BLOCK_PTR;
         }
         if ((write_blocks(start_addr, 1, &block_buffer) != 1)) {
+          printf("rc");
           break;
         };
       }
 
       // Read block from the disk -> block_buffer.
       if ((read_blocks(start_addr, 1, &block_buffer) != 1)) {
+        printf("rb");
         break;
       }
       // If data block pointed by the index block is NULL -> allocate a new
@@ -564,6 +568,7 @@ int sfs_fwrite(int fileID, char *buf, int length) {
         block_buffer.store.block_ptrs[block_num - 12].block_id = alloc_block();
         if (block_buffer.store.block_ptrs[block_num - 12].block_id ==
             NULL_BLOCK_PTR.block_id) {
+          printf("!~~\n");
           break;
         }
       }
@@ -573,6 +578,7 @@ int sfs_fwrite(int fileID, char *buf, int length) {
               block_buffer.store.block_ptrs[block_num - 12].block_end);
       // Write block from block_buffer -> disk.
       if ((write_blocks(start_addr, 1, &block_buffer) != 1)) {
+        printf("wb");
         break;
       }
       block_to_write = block_buffer.store.block_ptrs[block_num - 12];
@@ -580,12 +586,14 @@ int sfs_fwrite(int fileID, char *buf, int length) {
 
     int start_addr = parse_start_addr(block_to_write.block_id);
     if ((read_blocks(start_addr, 1, &block_buffer)) != 1) {
+      printf("ra");
       break;
     }
     // Write the actual data from the given buffer -> disk.
     memcpy(&(block_buffer.store.data[block_index]), buf + num_bytes_written,
            num_bytes_to_write);
     if ((write_blocks(start_addr, 1, &block_buffer)) != 1) {
+      printf("wa");
       break;
     }
     // Update after each iteration.
