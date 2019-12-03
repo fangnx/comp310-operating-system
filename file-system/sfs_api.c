@@ -7,7 +7,7 @@
  * @author nxxinf
  * @github https://github.com/fangnx
  * @created 2019-11-20 20:42:06
- * @last-modified 2019-12-03 18:20:58
+ * @last-modified 2019-12-03 18:40:22
  */
 
 #include "sfs_api.h"
@@ -518,6 +518,8 @@ int sfs_fwrite(int fileID, char *buf, int length) {
     num_bytes_to_write =
         MIN(BLOCK_SIZE - block_index, length - num_bytes_written);
 
+    printf("block_num: %d, block_index: %d\n", block_num, block_index);
+
     // Case: block is pointed by one of the 12 direct blocks.
     if (block_num < 12) {
       block_ptr assigned_block = file_inode.data_blocks[block_num];
@@ -528,11 +530,15 @@ int sfs_fwrite(int fileID, char *buf, int length) {
           printf("!\n");
           break;
         }
+
+        printf("1-a assigned_block: %d\n", assigned_block.block_id);
       }
       // Update block end marker.
       assigned_block.block_end =
           MAX(block_index + num_bytes_to_write, assigned_block.block_end);
       block_to_write = assigned_block;
+      printf("1-b assigned_block: %d\n", assigned_block.block_id);
+
     }
     // Case: block is pointed by the singly indirect block pointer.
     else {
@@ -546,6 +552,7 @@ int sfs_fwrite(int fileID, char *buf, int length) {
           break;
         }
 
+        printf("2-a assigned_block: %d\n", assigned_block.block_id);
         // Init all block pointers in the block to NULL.
         for (int i = 0; i < (BLOCK_SIZE / sizeof(block_ptr)); i++) {
           block_buffer.store.block_ptrs[i] = NULL_BLOCK_PTR;
@@ -571,6 +578,8 @@ int sfs_fwrite(int fileID, char *buf, int length) {
           printf("!~~\n");
           break;
         }
+
+        printf("2-b assigned_block: %d\n", assigned_block.block_id);
       }
       // Update block end marker.
       block_buffer.store.block_ptrs[block_num - 12].block_end =
@@ -583,6 +592,8 @@ int sfs_fwrite(int fileID, char *buf, int length) {
       }
       block_to_write = block_buffer.store.block_ptrs[block_num - 12];
     }
+
+    printf("3-fin assigned_block: %d\n", block_to_write.block_id);
 
     int start_addr = parse_start_addr(block_to_write.block_id);
     if ((read_blocks(start_addr, 1, &block_buffer)) != 1) {
