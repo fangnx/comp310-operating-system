@@ -7,7 +7,7 @@
  * @author nxxinf
  * @github https://github.com/fangnx
  * @created 2019-11-20 20:42:06
- * @last-modified 2019-12-03 17:22:20
+ * @last-modified 2019-12-03 17:46:41
  */
 
 #include "sfs_api.h"
@@ -620,7 +620,7 @@ int sfs_fread(int fileID, char *buf, int length) {
   int block_index, block_num;
   block_ptr block_to_read;
 
-  // Find inode  of the file.
+  // Find inode of the file.
   inode file_inode = inode_arr[file_descriptor_table[fileID].inode_index];
 
   while (num_bytes_read < length) {
@@ -641,8 +641,8 @@ int sfs_fread(int fileID, char *buf, int length) {
         memset(buf + num_bytes_read, 0, sizeof(char) * num_bytes_to_read);
       } else {
         block_to_read = file_inode.data_blocks[block_num];
-        int start_addr = parse_start_addr(block_to_read.block_id);
 
+        int start_addr = parse_start_addr(block_to_read.block_id);
         read_blocks(start_addr, 1, &block_buffer);
         // With block in block_buffer, copy data from block_buffer to the
         // given buffer.
@@ -655,8 +655,9 @@ int sfs_fread(int fileID, char *buf, int length) {
       if (file_inode.singly_indirect_ptr.block_id == NULL_BLOCK_PTR.block_id) {
         memset(buf + num_bytes_read, 0, sizeof(char) * num_bytes_to_read);
       } else {
-        block_to_read = file_inode.singly_indirect_ptr;
-        int start_addr = parse_start_addr(block_to_read.block_id);
+        int start_addr =
+            parse_start_addr(file_inode.singly_indirect_ptr.block_id);
+        read_blocks(start_addr, 1, &block_buffer);
 
         if (block_buffer.store.block_ptrs[block_num - 12].block_id ==
             NULL_BLOCK_PTR.block_id) {
@@ -664,6 +665,8 @@ int sfs_fread(int fileID, char *buf, int length) {
         } else {
           // With block in block_buffer, copy data from block_buffer to the
           // given buffer.
+          block_to_read = block_buffer.store.block_ptrs[block_num - 12];
+          start_addr = parse_start_addr(block_to_read.block_id);
           read_blocks(start_addr, 1, &block_buffer);
           memcpy(buf + num_bytes_read, &block_buffer.store.data[block_index],
                  num_bytes_to_read);
