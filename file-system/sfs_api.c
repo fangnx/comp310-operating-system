@@ -7,7 +7,7 @@
  * @author nxxinf
  * @github https://github.com/fangnx
  * @created 2019-11-20 20:42:06
- * @last-modified 2019-12-03 12:19:40
+ * @last-modified 2019-12-03 12:24:16
  */
 
 #include "sfs_api.h"
@@ -150,7 +150,7 @@ void init_new_file(int inode_index) {
 
 int get_new_file_size(int fdt_index) {
   int res = 0;
-  int inode_index = [file_descriptor_table[fdt_index].inode_index];
+  int inode_index = file_descriptor_table[fdt_index].inode_index;
   inode file_inode = inode_arr[inode_index];
 
   if (file_inode.singly_indirect_ptr.block_id != NULL_BLOCK_PTR.block_id) {
@@ -159,14 +159,14 @@ int get_new_file_size(int fdt_index) {
     for (int i = (BLOCK_SIZE) / sizeof(block_ptr) - 1; i > -1; i--) {
       if (block_buffer.store.block_ptrs[i].block_id !=
           NULL_BLOCK_PTR.block_id) {
-        res += block_buffer.store.block_ptrs[i].file_end;
+        res += block_buffer.store.block_ptrs[i].block_end;
       }
     }
   }
 
   for (int i = 0; i < 12; i++) {
     if (file_inode.data_blocks[i].block_id != NULL_BLOCK_PTR.block_id) {
-      res += file_inode.data_blocks[i].file_end;
+      res += file_inode.data_blocks[i].block_end;
     }
   }
 
