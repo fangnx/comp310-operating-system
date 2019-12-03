@@ -7,7 +7,7 @@
  * @author nxxinf
  * @github https://github.com/fangnx
  * @created 2019-11-20 20:42:06
- * @last-modified 2019-12-03 16:01:59
+ * @last-modified 2019-12-03 16:03:41
  */
 
 #include "sfs_api.h"
@@ -497,8 +497,8 @@ int sfs_fwrite(int fileID, char *buf, int length) {
       }
       // If data block pointed by the index block is NULL -> allocate a new
       // one.
-      if (block_buffer.store.block_ptrs[block_num - 12].block_id =
-              NULL_BLOCK_PTR.block_id) {
+      if (block_buffer.store.block_ptrs[block_num - 12].block_id ==
+          NULL_BLOCK_PTR.block_id) {
         block_buffer.store.block_ptrs[block_num - 12].block_id = alloc_block();
         if (block_buffer.store.block_ptrs[block_num - 12].block_id ==
             NULL_BLOCK_PTR.block_id) {
