@@ -7,7 +7,7 @@
  * @author nxxinf
  * @github https://github.com/fangnx
  * @created 2019-11-20 20:42:06
- * @last-modified 2019-12-03 12:24:16
+ * @last-modified 2019-12-03 13:04:00
  */
 
 #include "sfs_api.h"
@@ -398,10 +398,10 @@ int sfs_frseek(int fileID, int loc) {
   if (file_entry.inode_index != NULL_INODE) {
     int file_inode_index = file_descriptor_table[fileID].inode_index;
     // Check if loc is valid.
-    if (loc < 0 || loc > MAX_FILE_SIZE ||
-        loc > inode_arr[file_inode_index].file_size) {
+    if (loc < 0 || loc > inode_arr[file_inode_index].file_end) {
       return -1;
     }
+    // Move the read_ptr in the fdt entry.
     file_descriptor_table[fileID].read_ptr = loc;
     return 0;
   }
@@ -418,6 +418,8 @@ int sfs_fwseek(int fileID, int loc) {
   file_table_entry file_entry = file_descriptor_table[fileID];
   if (file_descriptor_table[fileID].inode_index != NULL_BLOCK_PTR.block_id &&
       0 <= loc && loc <= BLOCK_SIZE * (12 + BLOCK_SIZE / sizeof(block_ptr))) {
+    // Move the write_ptr in the fdt entry.
+    file_descriptor_table[fileID].write_ptr = loc;
     return 0;
   }
   return -1;
@@ -552,11 +554,11 @@ int sfs_fread(int fileID, char *buf, int length) {
     return 0;
   }
   int num_bytes_read, num_bytes_to_read;
+  num_bytes_read = 0;
   int block_index, block_num;
   block_ptr block_to_read;
-  num_bytes_read = 0;
-  num_bytes_to_read = 0;
 
+  // Find inode  of the file.
   inode file_inode = inode_arr[file_descriptor_table[fileID].inode_index];
 
   while (num_bytes_read < length) {
@@ -565,8 +567,8 @@ int sfs_fread(int fileID, char *buf, int length) {
     }
     // block_num: index of block wrt table.
     // block_index: index inside that block.
-    block_index = file_descriptor_table[fileID].read_ptr % BLOCK_SIZE;
     block_num = file_descriptor_table[fileID].read_ptr / BLOCK_SIZE;
+    block_index = file_descriptor_table[fileID].read_ptr % BLOCK_SIZE;
     num_bytes_to_read =
         MIN(MIN(BLOCK_SIZE - block_index, length - num_bytes_read),
             file_inode.file_end - file_descriptor_table[fileID].read_ptr);
@@ -576,8 +578,9 @@ int sfs_fread(int fileID, char *buf, int length) {
           NULL_BLOCK_PTR.block_id) {
         memset(buf + num_bytes_read, 0, sizeof(char) * num_bytes_to_read);
       } else {
-        block_ptr assigned_block = file_inode.data_blocks[block_num];
-        int start_addr = parse_start_addr(assigned_block.block_id);
+        block_to_read = file_inode.data_blocks[block_num];
+        int start_addr = parse_start_addr(block_to_read.block_id);
+
         read_blocks(start_addr, 1, &block_buffer);
         // With block in block_buffer, copy data from block_buffer to the
         // given buffer.
@@ -590,8 +593,8 @@ int sfs_fread(int fileID, char *buf, int length) {
       if (file_inode.singly_indirect_ptr.block_id == NULL_BLOCK_PTR.block_id) {
         memset(buf + num_bytes_read, 0, sizeof(char) * num_bytes_to_read);
       } else {
-        block_ptr assigned_block = file_inode.singly_indirect_ptr;
-        int start_addr = parse_start_addr(assigned_block.block_id);
+        block_to_read = file_inode.singly_indirect_ptr;
+        int start_addr = parse_start_addr(block_to_read.block_id);
 
         read_blocks(start_addr, 1, &block_buffer);
         if (block_buffer.store.block_ptrs[block_num - 12].block_id ==
