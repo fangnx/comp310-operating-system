@@ -7,7 +7,7 @@
  * @author nxxinf
  * @github https://github.com/fangnx
  * @created 2019-11-20 20:42:06
- * @last-modified 2019-12-03 17:08:50
+ * @last-modified 2019-12-03 17:10:18
  */
 
 #include "sfs_api.h"
@@ -67,7 +67,8 @@ static superblock sfs_superblock = {
                     1, &dir_entry_arr[i * (BLOCK_SIZE / sizeof(dir_entry))]); \
     }                                                                         \
                                                                               \
-    if (inode_arr[1].singly_indirect_ptr != NULL_BLOCK_PTR.block_id) {        \
+    if (inode_arr[1].singly_indirect_ptr.block_id !=                          \
+        NULL_BLOCK_PTR.block_id) {                                            \
       read_blocks(1 + sfs_superblock.num_inode_blocks +                       \
                       inode_arr[1].singly_indirect_ptr.block_id,              \
                   1, &block_buffer);                                          \
