@@ -7,7 +7,7 @@
  * @author nxxinf
  * @github https://github.com/fangnx
  * @created 2019-11-20 20:42:06
- * @last-modified 2019-12-03 13:58:26
+ * @last-modified 2019-12-03 14:17:30
  */
 
 #include "sfs_api.h"
@@ -601,12 +601,13 @@ int sfs_fread(int fileID, char *buf, int length) {
         if (block_buffer.store.block_ptrs[block_num - 12].block_id ==
             NULL_BLOCK_PTR.block_id) {
           memset(buf + num_bytes_read, 0, sizeof(char) * num_bytes_to_read);
+        } else {
+          // With block in block_buffer, copy data from block_buffer to the
+          // given buffer.
+          read_blocks(start_addr, 1, &block_buffer);
+          memcpy(buf + num_bytes_read, &block_buffer.store.data[block_index],
+                 num_bytes_to_read);
         }
-        // With block in block_buffer, copy data from block_buffer to the
-        // given buffer.
-        read_blocks(start_addr, 1, &block_buffer);
-        memcpy(buf + num_bytes_read, &block_buffer.store.data[block_index],
-               num_bytes_to_read);
       }
     }
     // Update info after each iter.
