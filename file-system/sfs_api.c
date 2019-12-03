@@ -7,7 +7,7 @@
  * @author nxxinf
  * @github https://github.com/fangnx
  * @created 2019-11-20 20:42:06
- * @last-modified 2019-12-03 13:19:55
+ * @last-modified 2019-12-03 13:58:26
  */
 
 #include "sfs_api.h"
@@ -62,7 +62,7 @@ int alloc_block() {
   if (free_block_index == NULL_BLOCK_PTR.block_id) {
     return NULL_INODE;
   }
-  printf("Assigned free_block_index %d\n", free_block_index);
+  // printf("Assigned free_block_index %d\n", free_block_index);
   bitmap[free_block_index] = 1;
   return free_block_index;
 }
@@ -204,10 +204,10 @@ void mksfs(int fresh) {
               sfs_superblock.file_system_size);
   }
 
-  // Initialize bitmap.
-  for (int i = 0; i < sfs_superblock.num_data_blocks; i++) {
-    bitmap[i] = 0;
-  }
+  // // Initialize bitmap.
+  // for (int i = 0; i < sfs_superblock.num_data_blocks; i++) {
+  //   bitmap[i] = 0;
+  // }
   // Initialize directory entries.
   for (int i = 0; i < sfs_superblock.num_data_blocks; i++) {
     dir_entry_arr[i].inode_index = NULL_INODE;
