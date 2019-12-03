@@ -4,7 +4,7 @@
  * @author nxxinf
  * @github https://github.com/fangnx
  * @created 2019-11-20 20:42:51
- * @last-modified 2019-12-02 23:53:17
+ * @last-modified 2019-12-03 15:19:14
  */
 
 #include <stdint.h>
@@ -14,10 +14,10 @@
 #include "disk_emu.h"
 
 // Constants.
-#define MAX_FNAME_LENGTH 60
+#define MAX_FNAME_LENGTH 28
 #define MAX_FILE_EXTENSION_LENGTH 4
 #define BLOCK_SIZE 1024
-#define NUM_DATA_BLOCKS 8192
+#define NUM_DATA_BLOCKS 4096
 #define NUM_DATA_BLOCKS_PER_INODE 12
 #define MAX_FILE_SIZE (NUM_DATA_BLOCKS_PER_INODE + 1) * BLOCK_SIZE
 
