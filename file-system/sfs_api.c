@@ -7,7 +7,7 @@
  * @author nxxinf
  * @github https://github.com/fangnx
  * @created 2019-11-20 20:42:06
- * @last-modified 2019-12-03 15:13:25
+ * @last-modified 2019-12-03 16:01:59
  */
 
 #include "sfs_api.h"
@@ -39,8 +39,8 @@ static superblock sfs_superblock = {
     .block_size = BLOCK_SIZE,
     .num_data_blocks = NUM_DATA_BLOCKS,
     .num_inode_blocks = sizeof(inode) * NUM_DATA_BLOCKS / BLOCK_SIZE,
-    .file_system_size =
-        1 + sizeof(inode) * NUM_DATA_BLOCKS / BLOCK_SIZE + NUM_DATA_BLOCKS};
+    .file_system_size = 1 + sizeof(inode) * NUM_DATA_BLOCKS / BLOCK_SIZE +
+                        NUM_DATA_BLOCKS + NUM_DATA_BLOCKS / BLOCK_SIZE};
 
 // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // SFS helper functions.
@@ -263,9 +263,9 @@ int sfs_fopen(char *name) {
 
   // If a file does not exist -> create a new file.
   if (dir_entry_index < 0) {
-    if (strlen(name) > MAX_FNAME_LENGTH) {
-      return -1;
-    }
+    // if (strlen(name) > MAX_FNAME_LENGTH) {
+    //   return -1;
+    // }
 
     // Find free slot of dir entry.
     dir_entry_index = find_free_dir_entry();
