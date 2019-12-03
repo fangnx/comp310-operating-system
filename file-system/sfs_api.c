@@ -7,7 +7,7 @@
  * @author nxxinf
  * @github https://github.com/fangnx
  * @created 2019-11-20 20:42:06
- * @last-modified 2019-12-03 17:10:18
+ * @last-modified 2019-12-03 17:16:14
  */
 
 #include "sfs_api.h"
@@ -636,85 +636,70 @@ int sfs_fread(int fileID, char *buf, int length) {
             file_inode.file_end - file_descriptor_table[fileID].read_ptr);
     // Case: block is pointed by one of the 12 direct blocks.
     if (block_num < 12) {
-      // if (file_inode.data_blocks[block_num].block_id ==
-      //     NULL_BLOCK_PTR.block_id) {
-      //   memset(buf + num_bytes_read, 0, sizeof(char) * num_bytes_to_read);
-      // } else {
-      block_to_read = file_inode.data_blocks[block_num];
-      int start_addr = parse_start_addr(block_to_read.block_id);
+      if (file_inode.data_blocks[block_num].block_id ==
+          NULL_BLOCK_PTR.block_id) {
+        memset(buf + num_bytes_read, 0, sizeof(char) * num_bytes_to_read);
+      } else {
+        block_to_read = file_inode.data_blocks[block_num];
+        int start_addr = parse_start_addr(block_to_read.block_id);
 
-      read_blocks(start_addr, 1, &block_buffer);
-      // With block in block_buffer, copy data from block_buffer to the
-      // given buffer.
-      memcpy(buf + num_bytes_read, &block_buffer.store.data[block_index],
-             num_bytes_to_read);
-      // }
-    }
-    // Case: block is pointed by the singly indirect block pointer.
-    else {
-      // if (file_inode.singly_indirect_ptr.block_id == NULL_BLOCK_PTR.block_id)
-      // {
-      //   memset(buf + num_bytes_read, 0, sizeof(char) * num_bytes_to_read);
-      // } else {
-      block_to_read = file_inode.singly_indirect_ptr;
-      int start_addr = parse_start_addr(block_to_read.block_id);
-
-      // if (block_buffer.store.block_ptrs[block_num - 12].block_id ==
-      //     NULL_BLOCK_PTR.block_id) {
-      //   memset(buf + num_bytes_read, 0, sizeof(char) * num_bytes_to_read);
-      // } else {
-      // With block in block_buffer, copy data from block_buffer to the
-      // given buffer.
-      read_blocks(start_addr, 1, &block_buffer);
-      memcpy(buf + num_bytes_read, &block_buffer.store.data[block_index],
-             num_bytes_to_read);
-    }
-    // }
-    // }
-    // Update info after each iter.
-    num_bytes_read += num_bytes_to_read;
-    // Update read pointer in fdt.
-    file_descriptor_table[fileID].read_ptr += num_bytes_to_read;
-  }
-  return num_bytes_read;
-}
-
-/**
- * Remove the file from the directory entry.
- * Release the file from file descriptor table & release the data blocks
- * used by file.
- */
-int sfs_remove(char *file) {
-  memset(&empty_buffer, 0, sizeof(block));
-
-  int file_index, fdt_index, start_addr;
-  // Get the file index in the directory.
-  file_index = find_dir_index_by_fname(file);
-  if (file_index >= 0) {
-    // Locate the dir_entry & inode.
-    dir_entry file_dir_entry = dir_entry_arr[file_index];
-    int file_inode_index = file_dir_entry.inode_index;
-    inode file_inode = inode_arr[file_inode_index];
-    // Clear the data blocks, and update bitmap.
-    // Case: first 12 direct blocks.
-    int temp_bid;
-    for (int i = 0; i < 12; i++) {
-      temp_bid = file_inode.data_blocks[i].block_id;
-      if (temp_bid != NULL_BLOCK_PTR.block_id) {
-        start_addr = parse_start_addr(temp_bid);
-        write_blocks(start_addr, 1, &empty_buffer);
-
-        bitmap[temp_bid] = 0;
+        read_blocks(start_addr, 1, &block_buffer);
+        // With block in block_buffer, copy data from block_buffer to the
+        // given buffer.
+        memcpy(buf + num_bytes_read, &block_buffer.store.data[block_index],
+               num_bytes_to_read);
+        // }
       }
-    }
-    // Case: the singly indirect block ptr.
-    temp_bid = file_inode.singly_indirect_ptr.block_id;
-    if (temp_bid != NULL_BLOCK_PTR.block_id) {
-      start_addr = parse_start_addr(temp_bid);
-      read_blocks(start_addr, 1, &block_buffer);
+      // Case: block is pointed by the singly indirect block pointer.
+      else {
+        if (file_inode.singly_indirect_ptr.block_id ==
+            NULL_BLOCK_PTR.block_id) {
+          memset(buf + num_bytes_read, 0, sizeof(char) * num_bytes_to_read);
+        } else {
+          block_to_read = file_inode.singly_indirect_ptr;
+          int start_addr = parse_start_addr(block_to_read.block_id);
 
-      for (int i = 0; i < (BLOCK_SIZE / sizeof(block_ptr)); i++) {
-        temp_bid = block_buffer.store.block_ptrs[i].block_id;
+          if (block_buffer.store.block_ptrs[block_num - 12].block_id ==
+              NULL_BLOCK_PTR.block_id) {
+            memset(buf + num_bytes_read, 0, sizeof(char) * num_bytes_to_read);
+          } else {
+            With block in block_buffer,
+                copy data from block_buffer to the given buffer.read_blocks(
+                    start_addr, 1, &block_buffer);
+            memcpy(buf + num_bytes_read, &block_buffer.store.data[block_index],
+                   num_bytes_to_read);
+          }
+        }
+      }
+      // Update info after each iter.
+      num_bytes_read += num_bytes_to_read;
+      // Update read pointer in fdt.
+      file_descriptor_table[fileID].read_ptr += num_bytes_to_read;
+    }
+    return num_bytes_read;
+  }
+
+  /**
+   * Remove the file from the directory entry.
+   * Release the file from file descriptor table & release the data blocks
+   * used by file.
+   */
+  int sfs_remove(char *file) {
+    memset(&empty_buffer, 0, sizeof(block));
+
+    int file_index, fdt_index, start_addr;
+    // Get the file index in the directory.
+    file_index = find_dir_index_by_fname(file);
+    if (file_index >= 0) {
+      // Locate the dir_entry & inode.
+      dir_entry file_dir_entry = dir_entry_arr[file_index];
+      int file_inode_index = file_dir_entry.inode_index;
+      inode file_inode = inode_arr[file_inode_index];
+      // Clear the data blocks, and update bitmap.
+      // Case: first 12 direct blocks.
+      int temp_bid;
+      for (int i = 0; i < 12; i++) {
+        temp_bid = file_inode.data_blocks[i].block_id;
         if (temp_bid != NULL_BLOCK_PTR.block_id) {
           start_addr = parse_start_addr(temp_bid);
           write_blocks(start_addr, 1, &empty_buffer);
@@ -722,24 +707,39 @@ int sfs_remove(char *file) {
           bitmap[temp_bid] = 0;
         }
       }
+      // Case: the singly indirect block ptr.
+      temp_bid = file_inode.singly_indirect_ptr.block_id;
+      if (temp_bid != NULL_BLOCK_PTR.block_id) {
+        start_addr = parse_start_addr(temp_bid);
+        read_blocks(start_addr, 1, &block_buffer);
+
+        for (int i = 0; i < (BLOCK_SIZE / sizeof(block_ptr)); i++) {
+          temp_bid = block_buffer.store.block_ptrs[i].block_id;
+          if (temp_bid != NULL_BLOCK_PTR.block_id) {
+            start_addr = parse_start_addr(temp_bid);
+            write_blocks(start_addr, 1, &empty_buffer);
+
+            bitmap[temp_bid] = 0;
+          }
+        }
+      }
+      SYNCH_BITMAP(write);
+      // Reset inode.
+      memset(&file_inode, 0, sizeof(inode));
+      // Reset dir entry.
+      memset(&dir_entry_arr[file_index], 0, sizeof(dir_entry));
+      dir_entry_arr[file_index].inode_index = NULL_INODE;
+
+      SYNCH_DIRECTORY(write);
+      SYNCH_INODE(write);
+
+      // Close the file if opened.
+      fdt_index = find_fdt_index_by_inode(file_inode_index);
+      if (fdt_index < 0) {
+        sfs_fclose(fdt_index);
+      }
+
+      return 0;
     }
-    SYNCH_BITMAP(write);
-    // Reset inode.
-    memset(&file_inode, 0, sizeof(inode));
-    // Reset dir entry.
-    memset(&dir_entry_arr[file_index], 0, sizeof(dir_entry));
-    dir_entry_arr[file_index].inode_index = NULL_INODE;
-
-    SYNCH_DIRECTORY(write);
-    SYNCH_INODE(write);
-
-    // Close the file if opened.
-    fdt_index = find_fdt_index_by_inode(file_inode_index);
-    if (fdt_index < 0) {
-      sfs_fclose(fdt_index);
-    }
-
-    return 0;
+    return -1;
   }
-  return -1;
-}
