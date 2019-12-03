@@ -7,7 +7,7 @@
  * @author nxxinf
  * @github https://github.com/fangnx
  * @created 2019-11-20 20:42:06
- * @last-modified 2019-12-03 13:04:00
+ * @last-modified 2019-12-03 13:19:55
  */
 
 #include "sfs_api.h"
@@ -60,8 +60,9 @@ int alloc_block() {
     }
   }
   if (free_block_index == NULL_BLOCK_PTR.block_id) {
-    return -1;
+    return NULL_INODE;
   }
+  printf("Assigned free_block_index %d\n", free_block_index);
   bitmap[free_block_index] = 1;
   return free_block_index;
 }
