@@ -7,7 +7,7 @@
  * @author nxxinf
  * @github https://github.com/fangnx
  * @created 2019-11-20 20:42:06
- * @last-modified 2019-12-03 10:37:26
+ * @last-modified 2019-12-03 12:19:40
  */
 
 #include "sfs_api.h"
@@ -146,6 +146,31 @@ void init_new_file(int inode_index) {
   inode_arr[inode_index].file_size = 0;
   inode_arr[inode_index].file_end = 0;
   inode_arr[inode_index].link_count = 1;
+}
+
+int get_new_file_size(int fdt_index) {
+  int res = 0;
+  int inode_index = [file_descriptor_table[fdt_index].inode_index];
+  inode file_inode = inode_arr[inode_index];
+
+  if (file_inode.singly_indirect_ptr.block_id != NULL_BLOCK_PTR.block_id) {
+    int start_addr = parse_start_addr(file_inode.singly_indirect_ptr.block_id);
+    read_blocks(start_addr, 1, &block_buffer);
+    for (int i = (BLOCK_SIZE) / sizeof(block_ptr) - 1; i > -1; i--) {
+      if (block_buffer.store.block_ptrs[i].block_id !=
+          NULL_BLOCK_PTR.block_id) {
+        res += block_buffer.store.block_ptrs[i].file_end;
+      }
+    }
+  }
+
+  for (int i = 0; i < 12; i++) {
+    if (file_inode.data_blocks[i].block_id != NULL_BLOCK_PTR.block_id) {
+      res += file_inode.data_blocks[i].file_end;
+    }
+  }
+
+  return res;
 }
 
 // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -417,17 +442,18 @@ int sfs_fwrite(int fileID, char *buf, int length) {
   inode file_inode = inode_arr[file_descriptor_table[fileID].inode_index];
 
   while (num_bytes_written < length) {
-    // ?
-    if (file_descriptor_table[fileID].write_ptr >
+    // Check if write_ptr exceeds the range.
+    if (file_descriptor_table[fileID].write_ptr >=
         BLOCK_SIZE * (12 + BLOCK_SIZE / sizeof(block_ptr))) {
       break;
     }
-    // block_num: index of block wrt table.
-    // block_index: index inside that block.
+    // block_num: index of block wrt the file descriptor table.
+    // block_index: index/offset inside that block.
     int block_num = file_descriptor_table[fileID].write_ptr / BLOCK_SIZE;
     int block_index = file_descriptor_table[fileID].write_ptr % BLOCK_SIZE;
     int num_bytes_to_write =
         MIN(BLOCK_SIZE - block_index, length - num_bytes_written);
+
     // Case: block is pointed by one of the 12 direct blocks.
     if (block_num < 12) {
       block_ptr assigned_block = file_inode.data_blocks[block_num];
@@ -462,6 +488,7 @@ int sfs_fwrite(int fileID, char *buf, int length) {
           break;
         };
       }
+
       // Read block from the disk -> block_buffer.
       if ((read_blocks(start_addr, 1, &block_buffer) != 1)) {
         break;
@@ -477,16 +504,14 @@ int sfs_fwrite(int fileID, char *buf, int length) {
         }
       }
       // Update block end marker.
-      // for (int i = 0; i < (BLOCK_SIZE / sizeof(block_ptr)); i++) {
-      //   block_buffer.store.block_ptrs[i - 12].block_id = alloc_block();
-      // }
       block_buffer.store.block_ptrs[block_num - 12].block_end =
           MAX(block_index + num_bytes_to_write,
               block_buffer.store.block_ptrs[block_num - 12].block_end);
       // Write block from block_buffer -> disk.
-      if ((write_blocks(start_addr, 1, &block_buffer) != -1)) {
+      if ((write_blocks(start_addr, 1, &block_buffer) != 1)) {
         break;
       }
+      block_to_write = block_buffer.store.block_ptrs[block_num - 12];
     }
 
     int start_addr = parse_start_addr(block_to_write.block_id);
@@ -505,7 +530,8 @@ int sfs_fwrite(int fileID, char *buf, int length) {
   }
 
   // Update file descriptor table.
-  inode_arr[file_descriptor_table[fileID].inode_index].file_size = 1;
+  inode_arr[file_descriptor_table[fileID].inode_index].file_size =
+      get_new_file_size(fileID);
   inode_arr[file_descriptor_table[fileID].inode_index].file_end =
       MAX(file_descriptor_table[fileID].write_ptr,
           inode_arr[file_descriptor_table[fileID].inode_index].file_end);
