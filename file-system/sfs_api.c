@@ -7,7 +7,7 @@
  * @author nxxinf
  * @github https://github.com/fangnx
  * @created 2019-11-20 20:42:06
- * @last-modified 2019-12-03 16:30:14
+ * @last-modified 2019-12-03 17:03:01
  */
 
 #include "sfs_api.h"
@@ -90,6 +90,8 @@ static superblock sfs_superblock = {
  * Allocate a free block.
  */
 int alloc_block() {
+  SYNCH_BITMAP(read);
+
   int free_block_index = NULL_BLOCK_PTR.block_id;
   for (int i = 0; i < sfs_superblock.num_data_blocks; i++) {
     if (bitmap[i] == 0) {
@@ -102,6 +104,8 @@ int alloc_block() {
   }
   // printf("Assigned free_block_index %d\n", free_block_index);
   bitmap[free_block_index] = 1;
+
+  SYNCH_BITMAP(write);
   return free_block_index;
 }
 
@@ -224,6 +228,8 @@ void mksfs(int fresh) {
     // Initialize a new disk.
     init_fresh_disk(sfs_superblock.signature, sfs_superblock.block_size,
                     sfs_superblock.file_system_size);
+
+    SYNCH_SUPERBLOCK(write);
     // Initialize the inode of index 1 to represent the root directory.
     inode_arr[1].file_size = 0;
     inode_arr[1].file_end = 0;
@@ -234,25 +240,37 @@ void mksfs(int fresh) {
     }
     memcpy(inode_arr[1].data_blocks, data_blocks, sizeof(int) * 12);
     inode_arr[1].singly_indirect_ptr = NULL_BLOCK_PTR;
+
+    SYNCH_INODE(write);
+    SYNCH_BITMAP(write);
+    // Initialize directory entries.
+    for (int i = 0; i < sfs_superblock.num_data_blocks; i++) {
+      dir_entry_arr[i].inode_index = NULL_INODE;
+    }
+    SYNCH_DIRECTORY(write);
+    // Initialize file descriptor table entries.
+    for (int i = 0; i < sfs_superblock.num_data_blocks; i++) {
+      file_descriptor_table[i].inode_index = NULL_INODE;
+    }
   }
   // The file system should be opened from the disk.
   else {
     // Initialize an existing disk.
     init_disk(sfs_superblock.signature, sfs_superblock.num_data_blocks,
               sfs_superblock.file_system_size);
-  }
+    // Initialize directory entries.
+    for (int i = 0; i < sfs_superblock.num_data_blocks; i++) {
+      dir_entry_arr[i].inode_index = NULL_INODE;
+    }
+    // Initialize file descriptor table entries.
+    for (int i = 0; i < sfs_superblock.num_data_blocks; i++) {
+      file_descriptor_table[i].inode_index = NULL_INODE;
+    }
 
-  // // Initialize bitmap.
-  // for (int i = 0; i < sfs_superblock.num_data_blocks; i++) {
-  //   bitmap[i] = 0;
-  // }
-  // Initialize directory entries.
-  for (int i = 0; i < sfs_superblock.num_data_blocks; i++) {
-    dir_entry_arr[i].inode_index = NULL_INODE;
-  }
-  // Initialize file descriptor table entries.
-  for (int i = 0; i < sfs_superblock.num_data_blocks; i++) {
-    file_descriptor_table[i].inode_index = NULL_INODE;
+    SYNCH_SUPERBLOCK(read);
+    SYNCH_INODE(read);
+    SYNCH_DIRECTORY(read);
+    SYNCH_BITMAP(read);
   }
 }
 
@@ -375,6 +393,10 @@ int sfs_fopen(char *name) {
     // Update directory info with the newly created file.
     strcpy(dir_entry_arr[dir_entry_index].fname, name);
     dir_entry_arr[dir_entry_index].inode_index = inode_index;
+
+    SYNCH_DIRECTORY(write);
+    SYNCH_INODE(write);
+    SYNCH_BITMAP(write);
   }
   // If file is already opened -> return the fdt index.
   else {
@@ -575,7 +597,7 @@ int sfs_fwrite(int fileID, char *buf, int length) {
   inode_arr[file_descriptor_table[fileID].inode_index].file_end =
       MAX(file_descriptor_table[fileID].write_ptr,
           inode_arr[file_descriptor_table[fileID].inode_index].file_end);
-
+  SYNCH_INODE(write);
   return num_bytes_written;
 }
 
@@ -699,11 +721,15 @@ int sfs_remove(char *file) {
         }
       }
     }
+    SYNCH_BITMAP(write);
     // Reset inode.
     memset(&file_inode, 0, sizeof(inode));
     // Reset dir entry.
     memset(&dir_entry_arr[file_index], 0, sizeof(dir_entry));
     dir_entry_arr[file_index].inode_index = NULL_INODE;
+
+    SYNCH_DIRECTORY(write);
+    SYNCH_INODE(write);
 
     // Close the file if opened.
     fdt_index = find_fdt_index_by_inode(file_inode_index);
