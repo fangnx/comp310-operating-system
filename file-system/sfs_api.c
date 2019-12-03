@@ -7,7 +7,7 @@
  * @author nxxinf
  * @github https://github.com/fangnx
  * @created 2019-11-20 20:42:06
- * @last-modified 2019-12-03 00:13:10
+ * @last-modified 2019-12-03 00:14:42
  */
 
 #include "sfs_api.h"
@@ -362,7 +362,7 @@ int sfs_frseek(int fileID, int loc) {
 /**
  * Move the write pointer.
  */
-int sfs_fwsdeek(int fileID, int loc) {
+int sfs_fwseek(int fileID, int loc) {
   if (fileID < 0) {
     return -1;
   }
@@ -459,7 +459,7 @@ int sfs_fwrite(int fileID, char *buf, int length) {
           MAX(block_index + num_bytes_to_write,
               block_buffer.store.block_ptrs[block_num - 12].block_end);
       // Write block from block_buffer -> disk.
-      if ((write_block(start_addr, 1, &block_buffer) != -1)) {
+      if ((write_blocks(start_addr, 1, &block_buffer) != -1)) {
         break;
       }
     }
