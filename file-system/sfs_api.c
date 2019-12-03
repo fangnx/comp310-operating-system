@@ -7,7 +7,7 @@
  * @author nxxinf
  * @github https://github.com/fangnx
  * @created 2019-11-20 20:42:06
- * @last-modified 2019-12-02 23:57:43
+ * @last-modified 2019-12-03 00:08:41
  */
 
 #include "sfs_api.h"
@@ -44,8 +44,8 @@ static superblock sfs_superblock = {
 // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // SFS helper functions.
 
-#define MIN(a, b) (a < b) ? a : b
-#define MAX(a, b) (a > b) ? a : b
+#define MIN(a, b) (((a) < (b)) ? (a) : (b))
+#define MAX(a, b) (((a) > (b)) ? (a) : (b))
 
 /**
  * Allocate a free block.
@@ -415,14 +415,15 @@ int sfs_fwrite(int fileID, char *buf, int length) {
         }
       }
       // Update block end marker.
-      assigned_block.end = MAX(block_index + num_bytes_to_write,
-                            inode_arr[file_inode.data_blocks[block_index].block_end);
-      block_to_write = alloc_block;
+      assigned_block.block_end =
+          MAX(block_index + num_bytes_to_write,
+              inode_arr[file_inode.data_blocks[block_index].block_end]);
+      block_to_write = assigned_block;
     }
     // Case: block is pointed by the singly indirect block pointer.
     else {
       block_ptr assigned_block = file_inode.singly_indirect_ptr;
-      int start_addr = parse_start_addr(alloc_block.block_id);
+      int start_addr = parse_start_addr(assigned_block.block_id);
       // If the allocated block is NULL -> allocate a new one.
       if (assigned_block.block_id == NULL_BLOCK_PTR.block_id) {
         assigned_block.block_id = alloc_block();
@@ -443,33 +444,36 @@ int sfs_fwrite(int fileID, char *buf, int length) {
         break;
       }
       // If data block pointed by the index block is NULL -> allocate a new one.
-      if (block_buffer.store.block_ptrs[i - 12].block_id =
+      if (block_buffer.store.block_ptrs[block_num - 12].block_id =
               NULL_BLOCK_PTR.block_id) {
-        block_buffer.store.block_ptrs[i - 12].block_id = alloc_block();
-        if (block_buffer.store.block_ptrs[i - 12].block_id ==
+        block_buffer.store.block_ptrs[block_num - 12].block_id = alloc_block();
+        if (block_buffer.store.block_ptrs[block_num - 12].block_id ==
             NULL_BLOCK_PTR.block_id) {
           break;
         }
       }
       // Update block end marker.
-      for (int i = 0; i < (BLOCK_SIZE / sizeof(block_ptr)); i++) {
-        block_buffer.store.block_ptrs[i - 12].block_id = alloc_block();
-      }
+      // for (int i = 0; i < (BLOCK_SIZE / sizeof(block_ptr)); i++) {
+      //   block_buffer.store.block_ptrs[i - 12].block_id = alloc_block();
+      // }
+      block_buffer.store.block_ptrs[block_num - 12].block_end =
+          MAX(block_index + num_bytes_to_write,
+              block_buffer.store.block_ptrs[block_num - 12].block_end);
       // Write block from block_buffer -> disk.
-      if ((write_block(start, 1, &block_buffer) != -1) {
+      if ((write_block(start_addr, 1, &block_buffer) != -1)) {
         break;
       }
     }
 
     int start_addr = parse_start_addr(block_to_write.block_id);
     if ((read_blocks(start_addr, 1, &block_buffer)) != 1) {
-      return break;
+      break;
     }
     // Write the actual data from the given buffer -> disk.
     memcpy(&(block_buffer.store.data[block_index]), buf + num_bytes_written,
            num_bytes_to_write);
     if ((write_blocks(start_addr, 1, &block_buffer)) != 1) {
-      return break;
+      break;
     }
     // Update after each iteration.
     num_bytes_written += num_bytes_to_write;
