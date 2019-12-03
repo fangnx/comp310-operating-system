@@ -4,7 +4,7 @@
  * @author nxxinf
  * @github https://github.com/fangnx
  * @created 2019-11-20 20:42:51
- * @last-modified 2019-12-02 20:00:24
+ * @last-modified 2019-12-02 23:53:17
  */
 
 #include <stdint.h>
@@ -24,6 +24,7 @@
 // Type definitions.
 typedef struct type_block_ptr {
   int block_id;
+  int block_end;
 } block_ptr;
 
 typedef struct type_inode {
@@ -46,6 +47,7 @@ typedef struct type_block {
     inode inodes[BLOCK_SIZE / sizeof(inode)];
     block_ptr block_ptrs[BLOCK_SIZE / sizeof(block_ptr)];
     dir_entry dir_entires[BLOCK_SIZE / sizeof(dir_entry)];
+    uint8_t data[BLOCK_SIZE / sizeof(uint8_t)]
   } store;
 } block;
 
