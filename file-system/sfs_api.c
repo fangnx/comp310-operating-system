@@ -7,7 +7,7 @@
  * @author nxxinf
  * @github https://github.com/fangnx
  * @created 2019-11-20 20:42:06
- * @last-modified 2019-12-03 00:08:41
+ * @last-modified 2019-12-03 00:13:10
  */
 
 #include "sfs_api.h"
@@ -416,8 +416,7 @@ int sfs_fwrite(int fileID, char *buf, int length) {
       }
       // Update block end marker.
       assigned_block.block_end =
-          MAX(block_index + num_bytes_to_write,
-              inode_arr[file_inode.data_blocks[block_index].block_end]);
+          MAX(block_index + num_bytes_to_write, assigned_block.block_end);
       block_to_write = assigned_block;
     }
     // Case: block is pointed by the singly indirect block pointer.
