@@ -7,7 +7,7 @@
  * @author nxxinf
  * @github https://github.com/fangnx
  * @created 2019-11-20 20:42:06
- * @last-modified 2019-12-03 00:26:44
+ * @last-modified 2019-12-03 10:37:26
  */
 
 #include "sfs_api.h"
@@ -23,7 +23,7 @@ static const int NULL_INODE = -1;
 
 // Initialize data structures for SFS.
 static uint8_t bitmap[NUM_DATA_BLOCKS];
-static file_table_entry file_descriptor_table[100];
+static file_table_entry file_descriptor_table[NUM_DATA_BLOCKS];
 static inode inode_arr[NUM_DATA_BLOCKS];
 static dir_entry dir_entry_arr[NUM_DATA_BLOCKS];
 
@@ -86,6 +86,15 @@ int find_dir_index_by_fname(char *fname) {
 int find_fdt_index_by_inode(int inode_index) {
   for (int i = 0; i < sfs_superblock.num_data_blocks; i++) {
     if (inode_index == file_descriptor_table[i].inode_index) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+int find_fdt_index_by_fname(char *fname) {
+  for (int i = 0; i < sfs_superblock.num_data_blocks; i++) {
+    if (strcmp(file_descriptor_table[i].fname, fname) == 0) {
       return i;
     }
   }
@@ -223,31 +232,32 @@ int sfs_getfilesize(const char *path) {
  */
 int sfs_fopen(char *name) {
   block_ptr block_to_open;
-  int file_index = find_dir_index_by_fname(name);
-
-  // Find free slot of dir entry.
-  int valid_dir_entry_index;
-  valid_dir_entry_index = find_free_dir_entry();
-  // valid_inode_index = find_free_inode();
-  // valid_fdt_entry_index = find_free_fdt_entry();
-  if (valid_dir_entry_index == -1) {
-    return -1;
-  }
-
-  int inode_index;
-  inode_index = dir_entry_arr[valid_dir_entry_index].inode_index;
+  int dir_entry_index;
+  dir_entry_index = find_dir_index_by_fname(name);
 
   // If a file does not exist -> create a new file.
-  if (file_index < 0) {
+  if (dir_entry_index < 0) {
     if (strlen(name) > MAX_FNAME_LENGTH) {
+      return -1;
+    }
+
+    // Find free slot of dir entry.
+    dir_entry_index = find_free_dir_entry();
+    if (dir_entry_index == -1) {
+      return -1;
+    }
+
+    // Find free slot of inode.
+    int inode_index;
+    inode_index = find_free_inode();
+    if (inode_index == NULL_INODE) {
       return -1;
     }
     // Init new file.
     init_new_file(inode_index);
 
     // Allocate a valid directory entry to the newly created file.
-    int block_num =
-        valid_dir_entry_index / DIR_ENTRIES_PER_BLOCK;  // From 1 to 13.
+    int block_num = dir_entry_index / DIR_ENTRIES_PER_BLOCK;  // From 1 to 13.
     // Case: block is pointed by the 12 direct block
     if (block_num < 12) {
       block_to_open = inode_arr[1].data_blocks[block_num];
@@ -260,7 +270,7 @@ int sfs_fopen(char *name) {
         }
         // Init all dir entries in the newly created block NULL.
         for (int i = 0; i < DIR_ENTRIES_PER_BLOCK; i++) {
-          dir_entry_arr[valid_dir_entry_index + i].inode_index = NULL_INODE;
+          dir_entry_arr[dir_entry_index + i].inode_index = NULL_INODE;
         }
       }
     }
@@ -280,7 +290,7 @@ int sfs_fopen(char *name) {
         write_blocks(start_addr, 1, &block_buffer);
       }
 
-      int valid_block_index = valid_dir_entry_index / DIR_ENTRIES_PER_BLOCK;
+      int valid_block_index = dir_entry_index / DIR_ENTRIES_PER_BLOCK;
       read_blocks(start_addr, 1, &block_buffer);
       // If block ptr is NULL -> allocate a new block.
       if (block_buffer.store.block_ptrs[valid_block_index].block_id ==
@@ -292,26 +302,39 @@ int sfs_fopen(char *name) {
           return -1;
         }
         for (int i = 0; i < DIR_ENTRIES_PER_BLOCK; i++) {
-          dir_entry_arr[valid_dir_entry_index + i].inode_index = NULL_INODE;
+          dir_entry_arr[dir_entry_index + i].inode_index = NULL_INODE;
         }
       }
       write_blocks(start_addr, 1, &block_buffer);
     }
 
     // Update directory info with the newly created file.
-    strcpy(dir_entry_arr[valid_dir_entry_index].fname, name);
-    dir_entry_arr[valid_dir_entry_index].inode_index = inode_index;
+    strcpy(dir_entry_arr[dir_entry_index].fname, name);
+    dir_entry_arr[dir_entry_index].inode_index = inode_index;
   }
+  // If file is already opened -> return the fdt index.
+  else {
+    int fdt_index = find_fdt_index_by_fname(name);
+    if (fdt_index >= 0) {
+      return fdt_index;
+    }
+  }
+  // After making sure the file exists/is created, open the file.
 
   // Update the file descriptor table.
   // Read file ptr -> beginning of the file,
   // Write file ptr -> end of the file.
   int fdt_index;
-  fdt_index = find_fdt_index_by_inode(inode_index);
+  fdt_index = find_free_fdt_entry();
   if (fdt_index == -1) {
     return -1;
   }
 
+  // Find inode of the file.
+  int inode_index;
+  inode_index = dir_entry_arr[dir_entry_index].inode_index;
+
+  strcpy(file_descriptor_table[fdt_index].fname, name);
   file_descriptor_table[fdt_index].inode_index = inode_index;
   file_descriptor_table[fdt_index].read_ptr = 0;
   file_descriptor_table[fdt_index].write_ptr = inode_arr[inode_index].file_end;
@@ -443,7 +466,8 @@ int sfs_fwrite(int fileID, char *buf, int length) {
       if ((read_blocks(start_addr, 1, &block_buffer) != 1)) {
         break;
       }
-      // If data block pointed by the index block is NULL -> allocate a new one.
+      // If data block pointed by the index block is NULL -> allocate a new
+      // one.
       if (block_buffer.store.block_ptrs[block_num - 12].block_id =
               NULL_BLOCK_PTR.block_id) {
         block_buffer.store.block_ptrs[block_num - 12].block_id = alloc_block();
@@ -529,8 +553,8 @@ int sfs_fread(int fileID, char *buf, int length) {
         block_ptr assigned_block = file_inode.data_blocks[block_num];
         int start_addr = parse_start_addr(assigned_block.block_id);
         read_blocks(start_addr, 1, &block_buffer);
-        // With block in block_buffer, copy data from block_buffer to the given
-        // buffer.
+        // With block in block_buffer, copy data from block_buffer to the
+        // given buffer.
         memcpy(buf + num_bytes_read, &block_buffer.store.data[block_index],
                num_bytes_to_read);
       }
@@ -548,8 +572,8 @@ int sfs_fread(int fileID, char *buf, int length) {
             NULL_BLOCK_PTR.block_id) {
           memset(buf + num_bytes_read, 0, sizeof(char) * num_bytes_to_read);
         }
-        // With block in block_buffer, copy data from block_buffer to the given
-        // buffer.
+        // With block in block_buffer, copy data from block_buffer to the
+        // given buffer.
         read_blocks(start_addr, 1, &block_buffer);
         memcpy(buf + num_bytes_read, &block_buffer.store.data[block_index],
                num_bytes_to_read);
@@ -565,8 +589,8 @@ int sfs_fread(int fileID, char *buf, int length) {
 
 /**
  * Remove the file from the directory entry.
- * Release the file from file descriptor table & release the data blocks used by
- * file.
+ * Release the file from file descriptor table & release the data blocks
+ * used by file.
  */
 int sfs_remove(char *file) {
   memset(&empty_buffer, 0, sizeof(block));
