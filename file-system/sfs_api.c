@@ -7,7 +7,7 @@
  * @author nxxinf
  * @github https://github.com/fangnx
  * @created 2019-11-20 20:42:06
- * @last-modified 2019-12-03 00:14:42
+ * @last-modified 2019-12-03 00:26:44
  */
 
 #include "sfs_api.h"
@@ -35,6 +35,7 @@ static block empty_buffer;
 static int dir_curr;
 
 static superblock sfs_superblock = {
+    .signature = "sfs_folder",
     .block_size = BLOCK_SIZE,
     .num_data_blocks = NUM_DATA_BLOCKS,
     .num_inode_blocks = sizeof(inode) * NUM_DATA_BLOCKS / BLOCK_SIZE,
