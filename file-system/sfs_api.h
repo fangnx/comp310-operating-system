@@ -4,9 +4,10 @@
  * @author nxxinf
  * @github https://github.com/fangnx
  * @created 2019-11-20 20:42:51
- * @last-modified 2019-12-01 11:48:23
+ * @last-modified 2019-12-02 20:00:24
  */
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,6 +19,7 @@
 #define BLOCK_SIZE 1024
 #define NUM_DATA_BLOCKS 8192
 #define NUM_DATA_BLOCKS_PER_INODE 12
+#define MAX_FILE_SIZE (NUM_DATA_BLOCKS_PER_INODE + 1) * BLOCK_SIZE
 
 // Type definitions.
 typedef struct type_block_ptr {
@@ -26,7 +28,7 @@ typedef struct type_block_ptr {
 
 typedef struct type_inode {
   int file_size;
-  int eof;
+  int file_end;
   block_ptr data_blocks[12];      // 12 direct pointers.
   block_ptr singly_indirect_ptr;  // 1 singly indirect pointer.
   int link_count;
