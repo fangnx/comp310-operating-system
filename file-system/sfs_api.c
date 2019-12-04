@@ -492,7 +492,7 @@ int sfs_fwseek(int fileID, int loc) {
  * Return the number of bytes written.
  */
 int sfs_fwrite(int fileID, char *buf, int length) {
-  printf("fildID: %d content: %s\n", fileID, buf);
+  printf("WRITE~~~ fildID: %d content: %s\n", fileID, buf);
 
   memset(&block_buffer, 0, sizeof(block_ptr));
 
@@ -536,13 +536,13 @@ int sfs_fwrite(int fileID, char *buf, int length) {
           break;
         }
 
-        printf("1-a assigned_block: %d\n", assigned_block.block_id);
+//        printf("1-a assigned_block: %d\n", assigned_block.block_id);
       }
       // Update block end marker.
       assigned_block.block_end =
           MAX(block_index + num_bytes_to_write, assigned_block.block_end);
       block_to_write = assigned_block;
-      printf("1-b assigned_block: %d\n", assigned_block.block_id);
+  //    printf("1-b assigned_block: %d\n", assigned_block.block_id);
 
     }
     // Case: block is pointed by the singly indirect block pointer.
@@ -598,7 +598,7 @@ int sfs_fwrite(int fileID, char *buf, int length) {
       block_to_write = block_buffer.store.block_ptrs[block_num - 12];
     }
 
-    printf("3-fin assigned_block: %d\n", block_to_write.block_id);
+    //printf("3-fin assigned_block: %d\n", block_to_write.block_id);
 
     int start_addr = parse_start_addr(block_to_write.block_id);
     if ((read_blocks(start_addr, 1, &block_buffer)) != 1) {
@@ -632,6 +632,7 @@ int sfs_fwrite(int fileID, char *buf, int length) {
  */
 int sfs_fread(int fileID, char *buf, int length) {
   memset(&block_buffer, 0, sizeof(block));
+	printf("READ~~~ fileID: %d\n", fileID);
 
   if (fileID < 0 || fileID > sfs_superblock.num_data_blocks - 1) {
     return 0;
@@ -647,6 +648,8 @@ int sfs_fread(int fileID, char *buf, int length) {
   // Find inode of the file.
   inode file_inode = inode_arr[file_descriptor_table[fileID].inode_index];
 
+	printf("inode_index: %d\n", file_descriptor_table[fileID].inode_index);
+
   while (num_bytes_read < length) {
     if (file_descriptor_table[fileID].read_ptr >= file_inode.file_end) {
       break;
@@ -655,6 +658,9 @@ int sfs_fread(int fileID, char *buf, int length) {
     // block_index: index inside that block.
     block_num = file_descriptor_table[fileID].read_ptr / BLOCK_SIZE;
     block_index = file_descriptor_table[fileID].read_ptr % BLOCK_SIZE;
+
+		printf("block_num: %d, block_index: %d\n", block_num, block_index);
+
     num_bytes_to_read =
         MIN(MIN(BLOCK_SIZE - block_index, length - num_bytes_read),
             file_inode.file_end - file_descriptor_table[fileID].read_ptr);
@@ -662,6 +668,7 @@ int sfs_fread(int fileID, char *buf, int length) {
     if (block_num < 12) {
       if (file_inode.data_blocks[block_num].block_id ==
           NULL_BLOCK_PTR.block_id) {
+				printf("+++empty 1\n");
         memset(buf + num_bytes_read, 0, sizeof(char) * num_bytes_to_read);
       } else {
         block_to_read = file_inode.data_blocks[block_num];
@@ -677,7 +684,8 @@ int sfs_fread(int fileID, char *buf, int length) {
     // Case: block is pointed by the singly indirect block pointer.
     else {
       if (file_inode.singly_indirect_ptr.block_id == NULL_BLOCK_PTR.block_id) {
-        memset(buf + num_bytes_read, 0, sizeof(char) * num_bytes_to_read);
+        printf("+++empty 2\n");
+				memset(buf + num_bytes_read, 0, sizeof(char) * num_bytes_to_read);
       } else {
         int start_addr =
             parse_start_addr(file_inode.singly_indirect_ptr.block_id);
@@ -685,6 +693,7 @@ int sfs_fread(int fileID, char *buf, int length) {
 
         if (block_buffer.store.block_ptrs[block_num - 12].block_id ==
             NULL_BLOCK_PTR.block_id) {
+					printf("+++empty 2-1\n");
           memset(buf + num_bytes_read, 0, sizeof(char) * num_bytes_to_read);
         } else {
           // With block in block_buffer, copy data from block_buffer to the
@@ -697,6 +706,7 @@ int sfs_fread(int fileID, char *buf, int length) {
         }
       }
     }
+		printf("block_to_read index: %d\n", block_to_read);
     // Update info after each iter.
     num_bytes_read += num_bytes_to_read;
     // Update read pointer in fdt.
