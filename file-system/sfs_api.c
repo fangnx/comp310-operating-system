@@ -7,7 +7,7 @@
  * @author nxxinf
  * @github https://github.com/fangnx
  * @created 2019-11-20 20:42:06
- * @last-modified 2019-12-03 20:49:58
+ * @last-modified 2019-12-03 21:05:44
  */
 
 #include "sfs_api.h"
@@ -230,7 +230,7 @@ int get_new_file_size(int fdt_index) {
   if (file_inode.singly_indirect_ptr.block_id != NULL_BLOCK_PTR.block_id) {
     int start_addr = parse_start_addr(file_inode.singly_indirect_ptr.block_id);
     read_blocks(start_addr, 1, &block_buffer);
-    for (int i = (BLOCK_SIZE) / sizeof(block_ptr) - 1; i > -1; i--) {
+    for (int i = 0; i < BLOCK_SIZE / sizeof(block_ptr); i++) {
       if (block_buffer.store.block_ptrs[i].block_id !=
           NULL_BLOCK_PTR.block_id) {
         res += block_buffer.store.block_ptrs[i].block_end;
