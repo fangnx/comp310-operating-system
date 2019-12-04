@@ -7,7 +7,7 @@
  * @author nxxinf
  * @github https://github.com/fangnx
  * @created 2019-11-20 20:42:06
- * @last-modified 2019-12-03 20:43:16
+ * @last-modified 2019-12-03 20:49:58
  */
 
 #include "sfs_api.h"
@@ -47,17 +47,17 @@ static superblock sfs_superblock = {
 
 void load_save_inode(int act) {
   if (act == 0) {
-    read_blocks(1, sfs_superblock.num_inode_blocks, inode_arr)
+    read_blocks(1, sfs_superblock.num_inode_blocks, inode_arr);
   } else {
-    write_blocks(1, sfs_superblock.num_inode_blocks, inode_arr)
+    write_blocks(1, sfs_superblock.num_inode_blocks, inode_arr);
   }
 }
 
 void load_save_superblock(int act) {
   if (act == 0) {
-    read_blocks(0, 1, &sfs_superblock)
+    read_blocks(0, 1, &sfs_superblock);
   } else {
-    write_blocks(0, 1, &sfs_superblock)
+    write_blocks(0, 1, &sfs_superblock);
   }
 }
 
@@ -66,12 +66,12 @@ void load_save_bitmap(int act) {
     read_blocks(sfs_superblock.file_system_size -
                     sfs_superblock.num_data_blocks / sfs_superblock.block_size,
                 sfs_superblock.num_data_blocks / sfs_superblock.block_size,
-                bitmap)
+                bitmap);
   } else {
     write_blocks(sfs_superblock.file_system_size -
                      sfs_superblock.num_data_blocks / sfs_superblock.block_size,
                  sfs_superblock.num_data_blocks / sfs_superblock.block_size,
-                 bitmap)
+                 bitmap);
   }
 }
 
