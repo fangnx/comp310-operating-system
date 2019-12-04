@@ -7,7 +7,7 @@
  * @author nxxinf
  * @github https://github.com/fangnx
  * @created 2019-11-20 20:42:06
- * @last-modified 2019-12-03 18:40:22
+ * @last-modified 2019-12-03 19:30:05
  */
 
 #include "sfs_api.h"
@@ -492,6 +492,8 @@ int sfs_fwseek(int fileID, int loc) {
  * Return the number of bytes written.
  */
 int sfs_fwrite(int fileID, char *buf, int length) {
+  printf("fildID: %d content: %s\n", fileID, buf);
+
   memset(&block_buffer, 0, sizeof(block_ptr));
 
   // Check if file is present in fdt.
@@ -501,6 +503,9 @@ int sfs_fwrite(int fileID, char *buf, int length) {
   int num_bytes_written, num_bytes_to_write;
   block_ptr block_to_write;
   num_bytes_written = 0;
+
+  printf("file name: %s\n", file_descriptor_table[fileID].fname);
+  printf("inode_index: %d\n", file_descriptor_table[fileID].inode_index);
 
   // Find the file inode.
   inode file_inode = inode_arr[file_descriptor_table[fileID].inode_index];

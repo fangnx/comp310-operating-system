@@ -4,7 +4,7 @@
  * @author nxxinf
  * @github https://github.com/fangnx
  * @created 2019-11-20 20:42:51
- * @last-modified 2019-12-03 18:30:36
+ * @last-modified 2019-12-03 19:18:36
  */
 
 #include <stdint.h>
@@ -19,7 +19,7 @@
 #define BLOCK_SIZE 1024
 #define NUM_DATA_BLOCKS 4096
 #define NUM_DATA_BLOCKS_PER_INODE 12
-#define MAX_FILE_SIZE (NUM_DATA_BLOCKS_PER_INODE + 1) * BLOCK_SIZE
+// #define MAX_FILE_SIZE (NUM_DATA_BLOCKS_PER_INODE + 1) * BLOCK_SIZE
 
 // Type definitions.
 typedef struct type_block_ptr {
