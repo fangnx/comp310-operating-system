@@ -7,7 +7,7 @@
  * @author nxxinf
  * @github https://github.com/fangnx
  * @created 2019-11-20 20:42:06
- * @last-modified 2019-12-03 21:05:44
+ * @last-modified 2019-12-03 21:18:01
  */
 
 #include "sfs_api.h"
@@ -351,9 +351,9 @@ int sfs_fopen(char *name) {
 
   // If a file does not exist -> create a new file.
   if (dir_entry_index < 0) {
-    // if (strlen(name) > MAX_FNAME_LENGTH) {
-    //   return -1;
-    // }
+    if (strlen(name) > MAX_FNAME_LENGTH) {
+      return -1;
+    }
 
     // Find free slot of dir entry.
     dir_entry_index = find_free_dir_entry();
