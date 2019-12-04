@@ -7,7 +7,7 @@
  * @author nxxinf
  * @github https://github.com/fangnx
  * @created 2019-11-20 20:42:06
- * @last-modified 2019-12-03 21:18:01
+ * @last-modified 2019-12-03 21:32:36
  */
 
 #include "sfs_api.h"
@@ -83,11 +83,11 @@ void load_save_dir(int act) {
     if (act == 0) {
       read_blocks(1 + sfs_superblock.num_inode_blocks +
                       inode_arr[1].data_blocks[i].block_id,
-                  1, &dir_entry_arr[i * (BLOCK_SIZE / sizeof(dir_entry))]);
+                  1, &dir_entry_arr[i * DIR_ENTRIES_PER_BLOCK]);
     } else {
       write_blocks(1 + sfs_superblock.num_inode_blocks +
                        inode_arr[1].data_blocks[i].block_id,
-                   1, &dir_entry_arr[i * (BLOCK_SIZE / sizeof(dir_entry))]);
+                   1, &dir_entry_arr[i * DIR_ENTRIES_PER_BLOCK]);
     }
   }
 
@@ -100,15 +100,13 @@ void load_save_dir(int act) {
       if (block_buffer.store.block_ptrs[i].block_id == NULL_BLOCK_PTR.block_id)
         continue;
       if (act == 0) {
-        read_blocks(
-            1 + sfs_superblock.num_inode_blocks +
-                block_buffer.store.block_ptrs[i].block_id,
-            1, &dir_entry_arr[(12 + i) * (BLOCK_SIZE / sizeof(dir_entry))]);
+        read_blocks(1 + sfs_superblock.num_inode_blocks +
+                        block_buffer.store.block_ptrs[i].block_id,
+                    1, &dir_entry_arr[(12 + i) * DIR_ENTRIES_PER_BLOCK]);
       } else {
-        write_blocks(
-            1 + sfs_superblock.num_inode_blocks +
-                block_buffer.store.block_ptrs[i].block_id,
-            1, &dir_entry_arr[(12 + i) * (BLOCK_SIZE / sizeof(dir_entry))]);
+        write_blocks(1 + sfs_superblock.num_inode_blocks +
+                         block_buffer.store.block_ptrs[i].block_id,
+                     1, &dir_entry_arr[(12 + i) * DIR_ENTRIES_PER_BLOCK]);
       }
     }
   }
@@ -254,6 +252,8 @@ int get_new_file_size(int fdt_index) {
  * Initialize the simple file system.
  */
 void mksfs(int fresh) {
+  printf("DIR_ENTRIES_PER_BLOCK size: %d\n", DIR_ENTRIES_PER_BLOCK);
+
   // The file system should be created from scratch.
   if (fresh) {
     // Initialize a new disk.
