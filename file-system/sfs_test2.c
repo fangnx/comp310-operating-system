@@ -147,7 +147,7 @@ int main(int argc, char **argv) {
       }
       free(buffer);
     }
-    int tmp = sfs_getfileSize(names[i]);
+    int tmp = sfs_getfilesize(names[i]);
     if (filesize[i] != tmp) {
       fprintf(stderr, "ERROR: mismatch file size %d, %d\n", filesize[i], tmp);
       error_count++;

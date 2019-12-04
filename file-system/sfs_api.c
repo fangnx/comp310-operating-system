@@ -7,7 +7,7 @@
  * @author nxxinf
  * @github https://github.com/fangnx
  * @created 2019-11-20 20:42:06
- * @last-modified 2019-12-03 20:17:30
+ * @last-modified 2019-12-03 20:43:16
  */
 
 #include "sfs_api.h"
@@ -45,45 +45,74 @@ static superblock sfs_superblock = {
 // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // SFS helper functions.
 
-#define SYNCH_INODE(_opt) \
-  _opt##_blocks(1, sfs_superblock.num_inode_blocks, inode_arr)
-// superblock cache sync: 1 random read
-#define SYNCH_SUPERBLOCK(_opt) _opt##_blocks(0, 1, &sfs_superblock)
-// bitmap cache sync: 1 random read followed by 3 sequencial reads
-#define SYNCH_BITMAP(_opt)                                            \
-  _opt##_blocks(                                                      \
-      sfs_superblock.file_system_size -                               \
-          sfs_superblock.num_data_blocks / sfs_superblock.block_size, \
-      sfs_superblock.num_data_blocks / sfs_superblock.block_size, bitmap)
-// directory sync: multiple random reads
-#define SYNCH_DIRECTORY(_opt)                                                 \
-  {                                                                           \
-    memset(&block_buffer, 0, sizeof(block));                                  \
-    for (int i = 0; i < 12; i++) {                                            \
-      if (inode_arr[1].data_blocks[i].block_id == NULL_BLOCK_PTR.block_id)    \
-        continue;                                                             \
-      _opt##_blocks(1 + sfs_superblock.num_inode_blocks +                     \
-                        inode_arr[1].data_blocks[i].block_id,                 \
-                    1, &dir_entry_arr[i * (BLOCK_SIZE / sizeof(dir_entry))]); \
-    }                                                                         \
-                                                                              \
-    if (inode_arr[1].singly_indirect_ptr.block_id !=                          \
-        NULL_BLOCK_PTR.block_id) {                                            \
-      read_blocks(1 + sfs_superblock.num_inode_blocks +                       \
-                      inode_arr[1].singly_indirect_ptr.block_id,              \
-                  1, &block_buffer);                                          \
-                                                                              \
-      for (int i = 0; i < (BLOCK_SIZE / sizeof(block_ptr)); i++) {            \
-        if (block_buffer.store.block_ptrs[i].block_id ==                      \
-            NULL_BLOCK_PTR.block_id)                                          \
-          continue;                                                           \
-        _opt##_blocks(                                                        \
-            1 + sfs_superblock.num_inode_blocks +                             \
-                block_buffer.store.block_ptrs[i].block_id,                    \
-            1, &dir_entry_arr[(12 + i) * (BLOCK_SIZE / sizeof(dir_entry))]);  \
-      }                                                                       \
-    }                                                                         \
+void load_save_inode(int act) {
+  if (act == 0) {
+    read_blocks(1, sfs_superblock.num_inode_blocks, inode_arr)
+  } else {
+    write_blocks(1, sfs_superblock.num_inode_blocks, inode_arr)
   }
+}
+
+void load_save_superblock(int act) {
+  if (act == 0) {
+    read_blocks(0, 1, &sfs_superblock)
+  } else {
+    write_blocks(0, 1, &sfs_superblock)
+  }
+}
+
+void load_save_bitmap(int act) {
+  if (act == 0) {
+    read_blocks(sfs_superblock.file_system_size -
+                    sfs_superblock.num_data_blocks / sfs_superblock.block_size,
+                sfs_superblock.num_data_blocks / sfs_superblock.block_size,
+                bitmap)
+  } else {
+    write_blocks(sfs_superblock.file_system_size -
+                     sfs_superblock.num_data_blocks / sfs_superblock.block_size,
+                 sfs_superblock.num_data_blocks / sfs_superblock.block_size,
+                 bitmap)
+  }
+}
+
+void load_save_dir(int act) {
+  memset(&block_buffer, 0, sizeof(block));
+  for (int i = 0; i < 12; i++) {
+    if (inode_arr[1].data_blocks[i].block_id == NULL_BLOCK_PTR.block_id)
+      continue;
+    if (act == 0) {
+      read_blocks(1 + sfs_superblock.num_inode_blocks +
+                      inode_arr[1].data_blocks[i].block_id,
+                  1, &dir_entry_arr[i * (BLOCK_SIZE / sizeof(dir_entry))]);
+    } else {
+      write_blocks(1 + sfs_superblock.num_inode_blocks +
+                       inode_arr[1].data_blocks[i].block_id,
+                   1, &dir_entry_arr[i * (BLOCK_SIZE / sizeof(dir_entry))]);
+    }
+  }
+
+  if (inode_arr[1].singly_indirect_ptr.block_id != NULL_BLOCK_PTR.block_id) {
+    read_blocks(1 + sfs_superblock.num_inode_blocks +
+                    inode_arr[1].singly_indirect_ptr.block_id,
+                1, &block_buffer);
+
+    for (int i = 0; i < (BLOCK_SIZE / sizeof(block_ptr)); i++) {
+      if (block_buffer.store.block_ptrs[i].block_id == NULL_BLOCK_PTR.block_id)
+        continue;
+      if (act == 0) {
+        read_blocks(
+            1 + sfs_superblock.num_inode_blocks +
+                block_buffer.store.block_ptrs[i].block_id,
+            1, &dir_entry_arr[(12 + i) * (BLOCK_SIZE / sizeof(dir_entry))]);
+      } else {
+        write_blocks(
+            1 + sfs_superblock.num_inode_blocks +
+                block_buffer.store.block_ptrs[i].block_id,
+            1, &dir_entry_arr[(12 + i) * (BLOCK_SIZE / sizeof(dir_entry))]);
+      }
+    }
+  }
+}
 
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
@@ -92,7 +121,7 @@ static superblock sfs_superblock = {
  * Allocate a free block.
  */
 int alloc_block() {
-  SYNCH_BITMAP(read);
+  load_save_bitmap(0);
 
   int free_block_index = NULL_BLOCK_PTR.block_id;
   for (int i = 0; i < sfs_superblock.num_data_blocks; i++) {
@@ -107,7 +136,7 @@ int alloc_block() {
   // printf("Assigned free_block_index %d\n", free_block_index);
   bitmap[free_block_index] = 1;
 
-  SYNCH_BITMAP(write);
+  load_save_bitmap(1);
   return free_block_index;
 }
 
@@ -231,8 +260,9 @@ void mksfs(int fresh) {
     init_fresh_disk(sfs_superblock.signature, sfs_superblock.block_size,
                     sfs_superblock.file_system_size);
 
-    SYNCH_SUPERBLOCK(write);
-    // Initialize the inode of index 1 to represent the root directory.
+    load_save_superblock(1);
+    // Initialize the inode of index 1 to represent the root
+    // directory.
     inode_arr[1].file_size = 0;
     inode_arr[1].file_end = 0;
     inode_arr[1].link_count = 1;
@@ -243,13 +273,13 @@ void mksfs(int fresh) {
     memcpy(inode_arr[1].data_blocks, data_blocks, sizeof(int) * 12);
     inode_arr[1].singly_indirect_ptr = NULL_BLOCK_PTR;
 
-    SYNCH_INODE(write);
-    SYNCH_BITMAP(write);
+    load_save_inode(1);
+    load_save_bitmap(1);
     // Initialize directory entries.
     for (int i = 0; i < sfs_superblock.num_data_blocks; i++) {
       dir_entry_arr[i].inode_index = NULL_INODE;
     }
-    SYNCH_DIRECTORY(write);
+    load_save_dir(1);
     // Initialize file descriptor table entries.
     for (int i = 0; i < sfs_superblock.num_data_blocks; i++) {
       file_descriptor_table[i].inode_index = NULL_INODE;
@@ -269,10 +299,10 @@ void mksfs(int fresh) {
       file_descriptor_table[i].inode_index = NULL_INODE;
     }
 
-    SYNCH_SUPERBLOCK(read);
-    SYNCH_INODE(read);
-    SYNCH_DIRECTORY(read);
-    SYNCH_BITMAP(read);
+    load_save_superblock(0);
+    load_save_inode(0);
+    load_save_dir(0);
+    load_save_bitmap(0);
   }
 }
 
@@ -362,7 +392,8 @@ int sfs_fopen(char *name) {
     else {
       block_to_open = inode_arr[1].singly_indirect_ptr;
       int start_addr = parse_start_addr(block_to_open.block_id);
-      // If the singly indirect pointer is null -> allocate a new one.
+      // If the singly indirect pointer is null -> allocate a new
+      // one.
       if (inode_arr[1].singly_indirect_ptr.block_id ==
           NULL_BLOCK_PTR.block_id) {
         inode_arr[1].singly_indirect_ptr.block_id = alloc_block();
@@ -396,9 +427,9 @@ int sfs_fopen(char *name) {
     strcpy(dir_entry_arr[dir_entry_index].fname, name);
     dir_entry_arr[dir_entry_index].inode_index = inode_index;
 
-    SYNCH_DIRECTORY(write);
-    SYNCH_INODE(write);
-    SYNCH_BITMAP(write);
+    load_save_dir(1);
+    load_save_inode(1);
+    load_save_bitmap(1);
   }
   // If file is already opened -> return the fdt index.
   else {
@@ -492,7 +523,7 @@ int sfs_fwseek(int fileID, int loc) {
  * Return the number of bytes written.
  */
 int sfs_fwrite(int fileID, char *buf, int length) {
-  printf("WRITE~~~ fileID: %d content: %s\n", fileID, buf);
+  // printf("WRITE~~~ fileID: %d content: %s\n", fileID, buf);
 
   memset(&block_buffer, 0, sizeof(block_ptr));
 
@@ -504,8 +535,8 @@ int sfs_fwrite(int fileID, char *buf, int length) {
   block_ptr block_to_write;
   num_bytes_written = 0;
 
-  printf("file name: %s\n", file_descriptor_table[fileID].fname);
-  printf("inode_index: %d\n", file_descriptor_table[fileID].inode_index);
+  // printf("file name: %s\n", file_descriptor_table[fileID].fname);
+  // printf("inode_index: %d\n", file_descriptor_table[fileID].inode_index);
 
   // Find the file inode.
   inode file_inode = inode_arr[file_descriptor_table[fileID].inode_index];
@@ -523,7 +554,8 @@ int sfs_fwrite(int fileID, char *buf, int length) {
     num_bytes_to_write =
         MIN(BLOCK_SIZE - block_index, length - num_bytes_written);
 
-    printf("block_num: %d, block_index: %d\n", block_num, block_index);
+    // printf("block_num: %d, block_index: %d\n", block_num,
+    // block_index);
 
     // Case: block is pointed by one of the 12 direct blocks.
     if (block_num < 12) {
@@ -537,17 +569,14 @@ int sfs_fwrite(int fileID, char *buf, int length) {
         if (inode_arr[file_descriptor_table[fileID].inode_index]
                 .data_blocks[block_num]
                 .block_id == NULL_BLOCK_PTR.block_id) {
-          printf("!\n");
+          // printf("!\n");
           break;
         }
-
-        //        printf("1-a assigned_block: %d\n", assigned_block.block_id);
       }
       // Update block end marker.
       assigned_block.block_end =
           MAX(block_index + num_bytes_to_write, assigned_block.block_end);
       block_to_write = assigned_block;
-      //    printf("1-b assigned_block: %d\n", assigned_block.block_id);
 
     }
     // Case: block is pointed by the singly indirect block pointer.
@@ -561,38 +590,33 @@ int sfs_fwrite(int fileID, char *buf, int length) {
             .singly_indirect_ptr.block_id = alloc_block();
         if (inode_arr[file_descriptor_table[fileID].inode_index]
                 .singly_indirect_ptr.block_id == NULL_BLOCK_PTR.block_id) {
-          printf("!~\n");
+          // printf("!~\n");
           break;
         }
 
-        printf("2-a assigned_block: %d\n", assigned_block.block_id);
+        // printf("2-a assigned_block: %d\n", assigned_block.block_id);
         // Init all block pointers in the block to NULL.
         for (int i = 0; i < (BLOCK_SIZE / sizeof(block_ptr)); i++) {
           block_buffer.store.block_ptrs[i] = NULL_BLOCK_PTR;
         }
         if ((write_blocks(start_addr, 1, &block_buffer) != 1)) {
-          printf("rc");
           break;
         };
       }
 
       // Read block from the disk -> block_buffer.
       if ((read_blocks(start_addr, 1, &block_buffer) != 1)) {
-        printf("rb");
         break;
       }
-      // If data block pointed by the index block is NULL -> allocate a new
-      // one.
+      // If data block pointed by the index block is NULL ->
+      // allocate a new one.
       if (block_buffer.store.block_ptrs[block_num - 12].block_id ==
           NULL_BLOCK_PTR.block_id) {
         block_buffer.store.block_ptrs[block_num - 12].block_id = alloc_block();
         if (block_buffer.store.block_ptrs[block_num - 12].block_id ==
             NULL_BLOCK_PTR.block_id) {
-          printf("!~~\n");
           break;
         }
-
-        printf("2-b assigned_block: %d\n", assigned_block.block_id);
       }
       // Update block end marker.
       block_buffer.store.block_ptrs[block_num - 12].block_end =
@@ -600,24 +624,24 @@ int sfs_fwrite(int fileID, char *buf, int length) {
               block_buffer.store.block_ptrs[block_num - 12].block_end);
       // Write block from block_buffer -> disk.
       if ((write_blocks(start_addr, 1, &block_buffer) != 1)) {
-        printf("wb");
         break;
       }
       block_to_write = block_buffer.store.block_ptrs[block_num - 12];
     }
 
-    // printf("3-fin assigned_block: %d\n", block_to_write.block_id);
+    // printf("3-fin assigned_block: %d\n",
+    // block_to_write.block_id);
 
     int start_addr = parse_start_addr(block_to_write.block_id);
     if ((read_blocks(start_addr, 1, &block_buffer)) != 1) {
-      printf("ra");
+      // printf("ra");
       break;
     }
     // Write the actual data from the given buffer -> disk.
     memcpy(&(block_buffer.store.data[block_index]), buf + num_bytes_written,
            num_bytes_to_write);
     if ((write_blocks(start_addr, 1, &block_buffer)) != 1) {
-      printf("wa");
+      // printf("wa");
       break;
     }
     // Update after each iteration.
@@ -631,7 +655,7 @@ int sfs_fwrite(int fileID, char *buf, int length) {
   inode_arr[file_descriptor_table[fileID].inode_index].file_end =
       MAX(file_descriptor_table[fileID].write_ptr,
           inode_arr[file_descriptor_table[fileID].inode_index].file_end);
-  SYNCH_INODE(write);
+  load_save_inode(1);
   return num_bytes_written;
 }
 
@@ -640,7 +664,7 @@ int sfs_fwrite(int fileID, char *buf, int length) {
  */
 int sfs_fread(int fileID, char *buf, int length) {
   memset(&block_buffer, 0, sizeof(block));
-  printf("READ~~~ fileID: %d\n", fileID);
+  // printf("READ~~~ fileID: %d\n", fileID);
 
   if (fileID < 0 || fileID > sfs_superblock.num_data_blocks - 1) {
     return 0;
@@ -656,7 +680,7 @@ int sfs_fread(int fileID, char *buf, int length) {
   // Find inode of the file.
   inode file_inode = inode_arr[file_descriptor_table[fileID].inode_index];
 
-  printf("inode_index: %d\n", file_descriptor_table[fileID].inode_index);
+  // printf("inode_index: %d\n", file_descriptor_table[fileID].inode_index);
 
   while (num_bytes_read < length) {
     if (file_descriptor_table[fileID].read_ptr >= file_inode.file_end) {
@@ -667,7 +691,7 @@ int sfs_fread(int fileID, char *buf, int length) {
     block_num = file_descriptor_table[fileID].read_ptr / BLOCK_SIZE;
     block_index = file_descriptor_table[fileID].read_ptr % BLOCK_SIZE;
 
-    printf("block_num: %d, block_index: %d\n", block_num, block_index);
+    // printf("block_num: %d, block_index: %d\n", block_num, block_index);
 
     num_bytes_to_read =
         MIN(MIN(BLOCK_SIZE - block_index, length - num_bytes_read),
@@ -676,15 +700,15 @@ int sfs_fread(int fileID, char *buf, int length) {
     if (block_num < 12) {
       if (file_inode.data_blocks[block_num].block_id ==
           NULL_BLOCK_PTR.block_id) {
-        printf("+++empty 1\n");
+        // printf("+++empty 1\n");
         memset(buf + num_bytes_read, 0, sizeof(char) * num_bytes_to_read);
       } else {
         block_to_read = file_inode.data_blocks[block_num];
 
         int start_addr = parse_start_addr(block_to_read.block_id);
         read_blocks(start_addr, 1, &block_buffer);
-        // With block in block_buffer, copy data from block_buffer to the
-        // given buffer.
+        // With block in block_buffer, copy data from block_buffer
+        // to the given buffer.
         memcpy(buf + num_bytes_read, &block_buffer.store.data[block_index],
                num_bytes_to_read);
       }
@@ -692,7 +716,7 @@ int sfs_fread(int fileID, char *buf, int length) {
     // Case: block is pointed by the singly indirect block pointer.
     else {
       if (file_inode.singly_indirect_ptr.block_id == NULL_BLOCK_PTR.block_id) {
-        printf("+++empty 2\n");
+        // printf("+++empty 2\n");
         memset(buf + num_bytes_read, 0, sizeof(char) * num_bytes_to_read);
       } else {
         int start_addr =
@@ -701,11 +725,11 @@ int sfs_fread(int fileID, char *buf, int length) {
 
         if (block_buffer.store.block_ptrs[block_num - 12].block_id ==
             NULL_BLOCK_PTR.block_id) {
-          printf("+++empty 2-1\n");
+          // printf("+++empty 2-1\n");
           memset(buf + num_bytes_read, 0, sizeof(char) * num_bytes_to_read);
         } else {
-          // With block in block_buffer, copy data from block_buffer to the
-          // given buffer.
+          // With block in block_buffer, copy data from
+          // block_buffer to the given buffer.
           block_to_read = block_buffer.store.block_ptrs[block_num - 12];
           start_addr = parse_start_addr(block_to_read.block_id);
           read_blocks(start_addr, 1, &block_buffer);
@@ -714,7 +738,7 @@ int sfs_fread(int fileID, char *buf, int length) {
         }
       }
     }
-    printf("block_to_read index: %d\n", block_to_read);
+    // printf("block_to_read index: %d\n", block_to_read);
     // Update info after each iter.
     num_bytes_read += num_bytes_to_read;
     // Update read pointer in fdt.
@@ -725,8 +749,8 @@ int sfs_fread(int fileID, char *buf, int length) {
 
 /**
  * Remove the file from the directory entry.
- * Release the file from file descriptor table & release the data blocks
- * used by file.
+ * Release the file from file descriptor table & release the data
+ * blocks used by file.
  */
 int sfs_remove(char *file) {
   memset(&empty_buffer, 0, sizeof(block));
@@ -767,15 +791,15 @@ int sfs_remove(char *file) {
         }
       }
     }
-    SYNCH_BITMAP(write);
+    load_save_bitmap(1);
     // Reset inode.
     memset(&file_inode, 0, sizeof(inode));
     // Reset dir entry.
     memset(&dir_entry_arr[file_index], 0, sizeof(dir_entry));
     dir_entry_arr[file_index].inode_index = NULL_INODE;
 
-    SYNCH_DIRECTORY(write);
-    SYNCH_INODE(write);
+    load_save_dir(1);
+    load_save_inode(1);
 
     // Close the file if opened.
     fdt_index = find_fdt_index_by_inode(file_inode_index);
