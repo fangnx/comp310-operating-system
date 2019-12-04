@@ -666,11 +666,13 @@ int sfs_fread(int fileID, char *buf, int length) {
   memset(&block_buffer, 0, sizeof(block));
   // printf("READ~~~ fileID: %d\n", fileID);
 
-  if (fileID < 0 || fileID > sfs_superblock.num_data_blocks - 1) {
-    return 0;
+  if (fileID < 0 || fileID > sfs_superblock.num_data_blocks) {
+		// printf("Invalid fileID %d\n", fileID);
+		return 0;
   }
   if (file_descriptor_table[fileID].inode_index == NULL_INODE) {
-    return 0;
+    // printf("Null inode_index for file %s\n", file_descriptor_table[fileID].fname);
+		return 0;
   }
   int num_bytes_read, num_bytes_to_read;
   num_bytes_read = 0;
@@ -684,7 +686,8 @@ int sfs_fread(int fileID, char *buf, int length) {
 
   while (num_bytes_read < length) {
     if (file_descriptor_table[fileID].read_ptr >= file_inode.file_end) {
-      break;
+      // printf("Invaid read_ptr position %d; %d\n", file_descriptor_table[fileID].read_ptr, file_inode.file_end); 
+			break;
     }
     // block_num: index of block wrt table.
     // block_index: index inside that block.
@@ -700,7 +703,6 @@ int sfs_fread(int fileID, char *buf, int length) {
     if (block_num < 12) {
       if (file_inode.data_blocks[block_num].block_id ==
           NULL_BLOCK_PTR.block_id) {
-        // printf("+++empty 1\n");
         memset(buf + num_bytes_read, 0, sizeof(char) * num_bytes_to_read);
       } else {
         block_to_read = file_inode.data_blocks[block_num];
@@ -716,7 +718,6 @@ int sfs_fread(int fileID, char *buf, int length) {
     // Case: block is pointed by the singly indirect block pointer.
     else {
       if (file_inode.singly_indirect_ptr.block_id == NULL_BLOCK_PTR.block_id) {
-        // printf("+++empty 2\n");
         memset(buf + num_bytes_read, 0, sizeof(char) * num_bytes_to_read);
       } else {
         int start_addr =
@@ -725,7 +726,6 @@ int sfs_fread(int fileID, char *buf, int length) {
 
         if (block_buffer.store.block_ptrs[block_num - 12].block_id ==
             NULL_BLOCK_PTR.block_id) {
-          // printf("+++empty 2-1\n");
           memset(buf + num_bytes_read, 0, sizeof(char) * num_bytes_to_read);
         } else {
           // With block in block_buffer, copy data from
