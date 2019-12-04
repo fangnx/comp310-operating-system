@@ -252,7 +252,7 @@ int get_new_file_size(int fdt_index) {
  * Initialize the simple file system.
  */
 void mksfs(int fresh) {
-  printf("DIR_ENTRIES_PER_BLOCK size: %d\n", DIR_ENTRIES_PER_BLOCK);
+  printf("calculated block size: %ld\n", sizeof(block));
 
   // The file system should be created from scratch.
   if (fresh) {
@@ -288,7 +288,7 @@ void mksfs(int fresh) {
   // The file system should be opened from the disk.
   else {
     // Initialize an existing disk.
-    init_disk(sfs_superblock.signature, sfs_superblock.num_data_blocks,
+    init_disk(sfs_superblock.signature, sfs_superblock.block_size,
               sfs_superblock.file_system_size);
     // Initialize directory entries.
     for (int i = 0; i < sfs_superblock.num_data_blocks; i++) {
